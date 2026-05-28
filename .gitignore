@@ -1,0 +1,53 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.env
+.venv/
+venv/
+env/
+
+# Data and model outputs
+data/
+data/raw/
+data/processed/
+data/external/**/*.csv
+outputs/
+models/
+checkpoints/
+
+# Hugging Face / experiment caches
+.cache/
+wandb/
+mlruns/
+
+# Training/runtime logs
+logs/
+
+# Local research notes and generated reports
+reports/*
+!reports/report.md
+reports/*.pdf
+reports/*.docx
+
+# Local notebooks and one-off analysis utilities
+notebooks/
+scripts/analyze_*.py
+scripts/create_hard_neutral_augmentation.py
+scripts/plot_results.py
+scripts/prepare_fiqa_external.py
+scripts/summarize_*.py
+scripts/tune_*.py
+
+# Adapter files that are not required to load the LoRA weights
+adapters/**/chat_template.jinja
+adapters/**/tokenizer.json
+adapters/**/tokenizer_config.json
+adapters/**/training_args.bin
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

@@ -1,0 +1,54 @@
+project:
+  name: financial-llm-sentiment
+  seed: 42
+
+data:
+  dataset_name: takala/financial_phrasebank
+  dataset_config: sentences_50agree
+  raw_dir: data/raw/financial_phrasebank
+  output_dir: data/processed
+  train_size: 0.70
+  val_size: 0.15
+  test_size: 0.15
+  fractions: [0.20, 0.50, 1.00]
+  labels: [negative, neutral, positive]
+
+models:
+  finbert:
+    model_name: ProsusAI/finbert
+    batch_size: 32
+
+  llm:
+    model_name: Qwen/Qwen3-4B
+    max_seq_length: 384
+    batch_size: 8
+    dtype: bfloat16
+    enable_thinking: false
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  learning_rate: 0.0001
+  epochs: 3
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  gradient_checkpointing: true
+  output_dir: outputs/lora
+
+fusion:
+  thresholds: [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
+  method: threshold
+
+outputs:
+  run_dir: outputs/runs
