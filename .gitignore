@@ -51,3 +51,4 @@ adapters/**/training_args.bin
 .DS_Store
 Thumbs.db
 .vscode/
+overleaf_report/

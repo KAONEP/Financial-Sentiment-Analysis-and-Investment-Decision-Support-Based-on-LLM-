@@ -27,10 +27,7 @@ from financial_llm.system import (
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ADAPTER_PATH = BASE_DIR / "adapters" / "neutral_aware_lora_r8_full_raw_seed42"
-MODE_OPTIONS = {
-    "Formal financial news": "formal_news",
-    "General / cross-domain": "general",
-}
+DEPLOYED_MODE = "learned_stacking"
 CHUNK_STRATEGY_OPTIONS = {
     "Balanced (recommended)": {
         "robust_multiscale": True,
@@ -194,11 +191,11 @@ def render_result(result, investment_support: str | None = None) -> None:
             st.bar_chart(chart_df)
         with trace_tab:
             st.write(result.explanation)
-            st.write(f"Mode: `{result.decision.mode}`")
-            st.write(f"Base fusion label before neutral-margin: `{result.decision.base_label}`")
+            st.write(f"Fusion method: `{result.decision.mode}`")
+            st.write(f"Base fusion label: `{result.decision.base_label}`")
             st.write(f"Base fusion confidence: `{result.decision.base_confidence:.3f}`")
-            st.write(f"Neutral-margin applied: `{result.decision.neutral_margin_applied}`")
-            if result.decision.neutral_margin_gap is not None:
+            if result.decision.neutral_margin_applied:
+                st.write(f"Neutral-margin applied: `{result.decision.neutral_margin_applied}`")
                 st.write(f"Directional minus neutral margin: `{result.decision.neutral_margin_gap:.3f}`")
             st.caption(
                 "This system provides decision-support evidence, not trading instructions. "
@@ -211,7 +208,7 @@ def render_document_result(result, investment_support: str | None = None) -> Non
     metric_cols[0].metric("Document sentiment", result.label)
     metric_cols[1].metric("Document confidence", f"{result.confidence:.3f}")
     metric_cols[2].metric("Chunks analyzed", str(len(result.chunks)))
-    metric_cols[3].metric("Mode", result.mode)
+    metric_cols[3].metric("Fusion", result.mode)
     if result.stable_across_scales is None:
         metric_cols[4].metric("Chunk stability", "single-scale")
     else:
@@ -234,7 +231,7 @@ def render_document_result(result, investment_support: str | None = None) -> Non
         st.caption("Most influential article excerpts selected from the model evidence.")
         for idx, chunk in enumerate(result.top_evidence, start=1):
             st.markdown(
-                f"**Excerpt {idx}** · {chunk.decision.label} "
+                f"**Excerpt {idx}** - {chunk.decision.label} "
                 f"({chunk.decision.confidence:.3f})"
             )
             st.write(chunk.text)
@@ -271,17 +268,9 @@ def main() -> None:
     st.title("Financial Sentiment Analysis and Investment Support")
 
     with st.sidebar:
-        st.header("Inference mode")
-        mode_label = st.radio(
-            "Choose mode",
-            list(MODE_OPTIONS.keys()),
-            index=0,
-            help=(
-                "Formal financial news uses the in-domain PhraseBank-best threshold + neutral-margin rule. "
-                "General mode uses cross-domain weighted fusion selected with Twitter robustness."
-            ),
-        )
-        mode = MODE_OPTIONS[mode_label]
+        st.header("Model pipeline")
+        mode = DEPLOYED_MODE
+        st.caption("Fusion: validation-trained logistic stacking over FinBERT and Qwen3-4B LoRA probabilities.")
         st.divider()
         document_mode = st.toggle(
             "Auto chunk long articles",
@@ -311,6 +300,7 @@ def main() -> None:
             chunk_overlap = st.number_input("Chunk overlap", min_value=0, max_value=80, value=DEFAULT_CHUNK_OVERLAP, step=5)
         st.divider()
         st.caption("Final model: FinBERT + Qwen3-4B neutral-aware LoRA r8.")
+        st.caption("Archived: general weighted fusion is retained only as an experiment, not a deployed mode.")
         st.caption("LoRA adapter: adapters/neutral_aware_lora_r8_full_raw_seed42")
 
     input_mode = st.radio("Input type", ["Text", "URL"], horizontal=True)

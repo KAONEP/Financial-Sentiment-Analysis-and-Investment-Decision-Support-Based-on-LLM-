@@ -5,13 +5,12 @@ import re
 
 import numpy as np
 
-from .fusion import threshold_fusion, weighted_fusion
+from .fusion import logistic_stacking_fusion, threshold_fusion
 from .labels import LABELS
 
 
 FORMAL_NEWS_THRESHOLD = 0.91
 FORMAL_NEWS_MARGIN = 0.48
-GENERAL_MODE_MARGIN = 0.49
 DEFAULT_CHUNK_WORDS = 120
 DEFAULT_CHUNK_OVERLAP = 25
 DEFAULT_CHUNK_WORD_SCALES = (80, 120, 160, 220)
@@ -113,6 +112,35 @@ def apply_neutral_margin(probs: np.ndarray, margin: float) -> tuple[str, float, 
     return base_label, float(probs[best_idx]), False, gap
 
 
+def learned_stacking_fusion(
+    finbert_probs: np.ndarray,
+    llm_probs: np.ndarray,
+) -> SentimentDecision:
+    fused_probs = logistic_stacking_fusion(
+        llm_probs.reshape(1, -1),
+        finbert_probs.reshape(1, -1),
+    )[0]
+    base_idx = int(np.argmax(fused_probs))
+    base_label = LABELS[base_idx]
+    base_confidence = float(fused_probs[base_idx])
+    trace = (
+        "Learned stacking fusion combined FinBERT and LoRA class probabilities "
+        "through a validation-trained multinomial logistic regression. "
+        "No hard confidence threshold or extra neutral-margin correction was applied."
+    )
+    return SentimentDecision(
+        mode="learned_stacking",
+        label=base_label,
+        confidence=base_confidence,
+        probabilities=fused_probs,
+        base_label=base_label,
+        base_confidence=base_confidence,
+        neutral_margin_applied=False,
+        neutral_margin_gap=None,
+        trace=trace,
+    )
+
+
 def formal_news_fusion(
     finbert_probs: np.ndarray,
     llm_probs: np.ndarray,
@@ -138,33 +166,6 @@ def formal_news_fusion(
         trace += f" The base label {base_label} was changed to neutral because its margin over neutral was {gap:.3f}, below {margin:.2f}."
     return SentimentDecision(
         mode="formal_news",
-        label=label,
-        confidence=confidence,
-        probabilities=fused_probs,
-        base_label=base_label,
-        base_confidence=base_confidence,
-        neutral_margin_applied=margin_applied,
-        neutral_margin_gap=gap,
-        trace=trace,
-    )
-
-
-def general_mode_fusion(
-    finbert_probs: np.ndarray,
-    llm_probs: np.ndarray,
-    margin: float = GENERAL_MODE_MARGIN,
-) -> SentimentDecision:
-    fused_probs = weighted_fusion(llm_probs.reshape(1, -1), finbert_probs.reshape(1, -1))[0]
-    llm_conf = float(np.max(llm_probs))
-    base_idx = int(np.argmax(fused_probs))
-    base_label = LABELS[base_idx]
-    base_confidence = float(fused_probs[base_idx])
-    label, confidence, margin_applied, gap = apply_neutral_margin(fused_probs, margin)
-    trace = f"General mode used weighted fusion with LoRA confidence as alpha ({llm_conf:.3f})."
-    if margin_applied:
-        trace += f" The base label {base_label} was changed to neutral because its margin over neutral was {gap:.3f}, below {margin:.2f}."
-    return SentimentDecision(
-        mode="general",
         label=label,
         confidence=confidence,
         probabilities=fused_probs,
@@ -359,10 +360,12 @@ def should_use_document_mode(text: str, threshold_words: int = DEFAULT_LONG_TEXT
 
 
 def decide_from_probabilities(finbert_probs: np.ndarray, llm_probs: np.ndarray, mode: str) -> SentimentDecision:
-    if mode == "formal_news":
+    if mode in {"learned_stacking", "formal_news"}:
+        return learned_stacking_fusion(finbert_probs, llm_probs)
+    if mode == "hard_threshold_reference":
         return formal_news_fusion(finbert_probs, llm_probs)
     if mode == "general":
-        return general_mode_fusion(finbert_probs, llm_probs)
+        raise ValueError("General weighted fusion has been archived and is not used by the deployed system.")
     raise ValueError(f"Unsupported mode: {mode}")
 
 

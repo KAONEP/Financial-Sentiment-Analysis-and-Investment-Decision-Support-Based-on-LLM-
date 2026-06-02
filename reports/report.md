@@ -2,7 +2,7 @@
 
 ## Abstract
 
-Financial news sentiment analysis differs from general sentiment analysis because labels are often defined by likely investor impact rather than surface tone. This study examines whether parameter-efficient adaptation of an open-weight large language model improves financial sentiment classification, and whether fusion with a financial-domain encoder makes predictions more stable. Using Financial PhraseBank as the main dataset, we compare FinBERT, a strict supervised BERT baseline, zero-shot Qwen3-4B prompting, simple reasoning prompting, and Qwen3-4B with LoRA fine-tuning. We then evaluate LoRA under different training data sizes and label-balance conditions, and analyze rank/module ablations, calibration, statistical significance, higher-agreement robustness, and external robustness on Twitter Financial News Sentiment. The final system combines FinBERT, neutral-aware Qwen3-4B LoRA, confidence-based fusion, URL extraction, long-article window aggregation, supporting excerpts, and LLM-generated investment-support insights. Results show that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. Confidence-based fusion with a neutral-margin correction gives the best in-domain result, while external evaluation shows that fixed threshold fusion is less portable under distribution shift. The system therefore separates formal-news and general modes.
+Financial news sentiment analysis differs from general sentiment analysis because labels are often defined by likely investor impact rather than surface tone. This study examines whether parameter-efficient adaptation of an open-weight large language model improves financial sentiment classification, and whether fusion with a financial-domain encoder makes predictions more stable. Using Financial PhraseBank as the main dataset, we compare FinBERT, a strict supervised BERT baseline, zero-shot Qwen3-4B prompting, simple reasoning prompting, and Qwen3-4B with LoRA fine-tuning. We then evaluate LoRA under different training data sizes and label-balance conditions, and analyze rank/module ablations, calibration, statistical significance, higher-agreement robustness, and external robustness on Twitter Financial News Sentiment. The final system combines FinBERT, neutral-aware Qwen3-4B LoRA, learned probability fusion, URL extraction, long-article window aggregation, supporting excerpts, and LLM-generated investment-support insights. Results show that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. Hard threshold fusion with a neutral-margin correction gives the strongest in-domain reference result, while a validation-trained logistic stacking layer gives nearly the same in-domain performance with a more explainable decision rule. External evaluation shows that neither fixed threshold fusion nor learned stacking should be claimed as a general cross-domain solution.
 
 ## 1. Introduction
 
@@ -15,7 +15,7 @@ We study this question through both experiments and a working prototype. The res
 The main contributions are:
 
 1. A systematic evaluation of Qwen3-4B LoRA fine-tuning on Financial PhraseBank under different data-size and label-balance conditions.
-2. A confidence-based fusion method combining FinBERT and LoRA-adapted Qwen3-4B.
+2. Fusion methods combining FinBERT and LoRA-adapted Qwen3-4B, including a hard-threshold reference and a learned logistic-stacking system method.
 3. Robustness and reliability analyses including multi-seed checks, calibration, statistical testing, higher-agreement subsets, and external Twitter Financial News evaluation.
 4. Model understanding analyses based on error taxonomy, probability shifts, counterfactual probes, and hidden-state separability.
 5. A Streamlit-based financial sentiment and investment-support system with text/URL input and long-article processing.
@@ -119,11 +119,9 @@ The training objective is causal language modeling over the label token. The pro
 
 Error analysis showed that many remaining mistakes were neutral-boundary errors. Therefore, a neutral-aware prompt was introduced. It explicitly states that positive and negative labels should be used only when there is a clear beneficial or harmful financial implication, while factual corporate events without clear impact should be neutral.
 
-### 3.6 Confidence-Based Fusion
+### 3.6 Confidence-Based And Learned Fusion
 
-We use two fusion modes.
-
-Formal financial news mode uses threshold fusion:
+The first fusion experiments used hard threshold fusion:
 
 ```text
 if confidence_LoRA >= 0.91:
@@ -132,7 +130,7 @@ else:
     p_fused = p_FinBERT
 ```
 
-It then applies a neutral-margin rule:
+followed by a neutral-margin correction:
 
 ```text
 if y_base in {negative, positive}
@@ -140,18 +138,20 @@ and p_fused(y_base) - p_fused(neutral) < 0.48:
     y_final = neutral
 ```
 
-General mode uses weighted fusion:
+This gives the strongest in-domain Financial PhraseBank reference result, but the abrupt threshold is less interpretable as a deployed decision rule. Therefore, the final Streamlit system uses a validation-trained logistic stacking layer:
 
 ```text
-alpha = confidence_LoRA
-p_fused = alpha p_LoRA + (1 - alpha) p_FinBERT
+features = [
+  FinBERT_negative, FinBERT_neutral, FinBERT_positive,
+  LoRA_negative,    LoRA_neutral,    LoRA_positive
+]
+
+p_final = softmax(W features + b)
 ```
 
-It then applies a neutral-margin rule with margin 0.49. Formal-news mode prioritizes in-domain Financial PhraseBank performance, while general mode is intended to be more conservative under distribution shift. The deployed system uses the neutral-aware rank-8 LoRA adapter with formal-news threshold 0.91 and neutral margin 0.48.
+The stacking layer is trained on the validation predictions and evaluated once on the held-out test split. It does not assume that low LoRA confidence automatically makes FinBERT better. Instead, it learns how the two probability vectors jointly map to the final label. The previous general weighted-fusion flow is archived as an experiment and is not exposed as a deployed application mode.
 
-The numeric thresholds are treated as validation-selected hyperparameters rather than fixed assumptions. The LoRA confidence threshold is selected by grid search on validation predictions over 0.50 to 0.95 with step size 0.01, using macro-F1 as the selection metric. The formal-news neutral margin is selected by a second validation-set grid search over 0.00 to 0.50 with step size 0.01 after fixing the fusion base method. The test split is used only once for final reporting. The general-mode margin of 0.49 comes from a cross-domain diagnostic that combines PhraseBank validation with a held-out Twitter calibration split and selects the setting that maximizes worst-case macro-F1. This separation is used to reduce test-set overfitting risk.
-
-Calibration is evaluated separately from the deployed scoring rule. Temperature scaling is fitted on the validation split by minimizing negative log-likelihood, and calibrated fusion results are reported in the calibration experiment. The Streamlit prototype currently uses the raw label-scoring probabilities for operational fusion, so its confidence should be interpreted as a gating score rather than a fully calibrated correctness probability.
+Calibration is evaluated separately from the deployed scoring rule. Temperature scaling is fitted on the validation split by minimizing negative log-likelihood, and calibrated fusion results are reported in the calibration experiment. The Streamlit prototype currently uses raw model probabilities and the learned stacking output, so its confidence should be interpreted as a model score rather than a fully calibrated correctness probability.
 
 ### 3.7 Long-Article Inference
 
@@ -208,9 +208,11 @@ counterfactual probes
 hidden-state separability analysis
 ```
 
-Macro-F1 is emphasized because Financial PhraseBank is class-imbalanced and neutral-heavy. Accuracy and weighted-F1 are still reported for comparability with benchmark-style results. The validation split is used for selecting fusion thresholds, neutral margins, and calibration parameters; the test split is reserved for final reporting.
+Macro-F1 is emphasized because Financial PhraseBank is class-imbalanced and neutral-heavy. Accuracy and weighted-F1 are still reported for comparability with benchmark-style results. The validation split is used for selecting fusion thresholds, neutral margins, learned-stacking parameters, and calibration parameters; the test split is reserved for final reporting.
 
 ## 5. Results
+
+The results should be read with a clear domain distinction. Financial PhraseBank is the main benchmark and target style for the prototype: formal financial statements and news sentences labeled from an investor-impact perspective. Twitter Financial News Sentiment is used only as an external robustness check. PhraseBank therefore determines the main model-selection story, while Twitter tests how far that story transfers.
 
 ### 5.1 Baseline Results
 
@@ -268,8 +270,9 @@ The error taxonomy showed that many remaining errors were neutral-boundary mista
 | LoRA r8 neutral-aware trained | 0.8858 | 0.8813 | 0.8848 | 83 | 33 | 50 |
 | Previous calibrated r8 threshold fusion | 0.9051 | 0.9002 | 0.9056 | 69 | 47 | 21 |
 | Neutral-aware threshold + neutral margin | 0.9161 | 0.9101 | 0.9161 | 61 | 33 | 27 |
+| Learned logistic stacking fusion | 0.9161 | 0.9096 | 0.9162 | 61 | not reported | not reported |
 
-This final in-domain setting is used in the formal-news mode of the Streamlit system. The improvement comes from combining neutral-aware LoRA training with a margin rule that prevents weak directional predictions from overriding neutral when the probability gap is small.
+The hard threshold + neutral-margin rule remains the strongest in-domain reference by macro-F1. The deployed Streamlit system uses learned logistic stacking because it matches the hard-rule accuracy, is nearly identical in macro-F1, and has a clearer interpretation as a learned linear combiner over FinBERT and LoRA class probabilities.
 
 ### 5.6 Agreement Robustness
 
@@ -292,8 +295,11 @@ On Twitter Financial News Sentiment, LoRA transfers much better than FinBERT:
 | LoRA r8 | 0.8137 | 0.7895 |
 | r8 weighted fusion | 0.8153 | 0.7899 |
 | neutral-aware LoRA r8 | 0.8229 | 0.7975 |
+| learned logistic stacking fusion | 0.8099 | 0.7605 |
 
-However, fixed threshold fusion does not transfer reliably. A separate cross-domain diagnostic splits Twitter validation into a calibration half and a held-out evaluation half. Under that setting, a cross-domain selected weighted fusion reaches accuracy 0.8409 and macro-F1 0.8065 on the held-out half, while sacrificing some PhraseBank performance. This supports using separate formal-news and general modes.
+However, fixed threshold fusion and learned stacking do not transfer reliably to this Twitter distribution. This does not invalidate the in-domain fusion result, because Twitter Financial News Sentiment contains short ticker-oriented posts and social-media phrasing rather than formal news sentences. It does mean that the deployed fusion method should not be described as a universal cross-domain solution.
+
+A separate cross-domain diagnostic splits Twitter validation into a calibration half and a held-out evaluation half. Under that setting, a cross-domain selected weighted fusion reaches accuracy 0.8409 and macro-F1 0.8065 on the held-out half, while sacrificing some PhraseBank performance. Because this result depends on Twitter-side calibration, it is archived as a robustness diagnostic rather than exposed as a second deployed system mode. The main external conclusion is that standalone neutral-aware LoRA is the strongest tested model on Twitter, while PhraseBank-selected fusion is best understood as a formal-news pipeline.
 
 ### 5.8 Evaluation Coverage
 
@@ -337,7 +343,7 @@ input text or URL
 -> short-text or long-article inference
 -> FinBERT probabilities
 -> Qwen3-4B neutral-aware LoRA probabilities
--> confidence-based fusion
+-> learned logistic stacking fusion
 -> final sentiment and confidence
 -> supporting excerpts
 -> LLM-generated investment-support insight
@@ -351,17 +357,19 @@ The investment-support insight is generated by Qwen3-4B using the final sentimen
 
 The experiments support several conclusions. First, LoRA adaptation is needed because zero-shot Qwen3-4B is not sufficiently aligned with investor-perspective sentiment labels. Second, the raw training distribution is more stable than balanced undersampling because neutral examples are central to the Financial PhraseBank label scheme. Third, rank-8 attention+MLP LoRA offers a good efficiency-performance trade-off and works especially well when combined with fusion.
 
-The best in-domain result comes from neutral-aware confidence-based fusion with a neutral-margin correction. This suggests that FinBERT and LoRA provide complementary information, and that explicit handling of the neutral boundary matters for Financial PhraseBank. External robustness results also show that fixed threshold and margin rules are not universally portable. The system therefore separates formal-news mode from general mode.
+The best in-domain reference result comes from neutral-aware confidence-based fusion with a neutral-margin correction. However, the deployed system uses learned logistic stacking because it gives almost the same in-domain score while avoiding abrupt hard-threshold switching. This gives the project a cleaner final story: the hard rule shows the maximum observed PhraseBank gain, and the learned stacker is the more explainable system version.
+
+The Twitter check is kept because it prevents overclaiming. It shows that any fusion layer selected on PhraseBank validation must be treated as in-domain rather than universally robust. Optimizing further on Twitter would require a different experimental question, such as multi-domain calibration or domain-adaptive fusion, and would broaden the project beyond the current sub-theme.
 
 The model-understanding analyses show that the remaining difficulty is not basic sentiment polarity but neutral-boundary ambiguity. This is a meaningful limitation because many financial news items report factual events whose investor impact is debatable or delayed.
 
 ## 9. Limitations
 
-This study has several limitations. Financial PhraseBank is small and mostly sentence-level, while real financial articles are longer and more complex. The off-the-shelf FinBERT reference baseline is not leakage-free with respect to Financial PhraseBank, although the project includes a strict supervised BERT baseline to address this concern. The fusion threshold and neutral margin are selected on validation data, which reduces direct test-set overfitting but does not guarantee cross-domain portability. The confidence score is maximum softmax probability, which is useful as a gating signal but is not equivalent to true correctness probability; calibration results are therefore reported separately. The long-article system has not yet been quantitatively validated on a document-level labeled dataset. Finally, the hidden-state analysis provides diagnostic evidence, not full mechanistic interpretability.
+This study has several limitations. Financial PhraseBank is small and mostly sentence-level, while real financial articles are longer and more complex. The off-the-shelf FinBERT reference baseline is not leakage-free with respect to Financial PhraseBank, although the project includes a strict supervised BERT baseline to address this concern. The learned stacking layer and the archived threshold rules are selected on validation data, which reduces direct test-set overfitting but does not guarantee cross-domain portability. The confidence score is derived from model probabilities and should not be interpreted as a fully calibrated correctness probability; calibration results are therefore reported separately. The long-article system has not yet been quantitatively validated on a document-level labeled dataset. Finally, the hidden-state analysis provides diagnostic evidence, not full mechanistic interpretability.
 
 ## 10. Conclusion
 
-This study shows that LoRA fine-tuning can adapt an open-weight LLM to investor-perspective financial sentiment analysis. Qwen3-4B LoRA improves clearly over zero-shot prompting and outperforms a strict supervised BERT baseline on the fixed Financial PhraseBank test split. Confidence-based fusion with FinBERT and neutral-margin correction further improves in-domain stability and gives the best Financial PhraseBank result in this study. Robustness and model-understanding analyses show that the main remaining challenges are neutral-boundary ambiguity and threshold portability under distribution shift. The final Streamlit system applies the selected model pipeline to financial news text and URL analysis, returning sentiment, confidence, supporting excerpts, and investment-support insight.
+This study shows that LoRA fine-tuning can adapt an open-weight LLM to investor-perspective financial sentiment analysis. Qwen3-4B LoRA improves clearly over zero-shot prompting and outperforms a strict supervised BERT baseline on the fixed Financial PhraseBank test split. Confidence-based fusion with FinBERT and neutral-margin correction gives the strongest in-domain reference result, while learned logistic stacking provides a nearly equivalent and more interpretable deployed fusion method. Robustness and model-understanding analyses show that the main remaining challenges are neutral-boundary ambiguity and fusion portability under distribution shift. The final Streamlit system applies the selected model pipeline to financial news text and URL analysis, returning sentiment, confidence, supporting excerpts, and investment-support insight.
 
 ## References
 
