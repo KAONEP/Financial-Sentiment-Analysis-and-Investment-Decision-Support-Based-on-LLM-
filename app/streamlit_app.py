@@ -194,9 +194,6 @@ def render_result(result, investment_support: str | None = None) -> None:
             st.write(f"Fusion method: `{result.decision.mode}`")
             st.write(f"Base fusion label: `{result.decision.base_label}`")
             st.write(f"Base fusion confidence: `{result.decision.base_confidence:.3f}`")
-            if result.decision.neutral_margin_applied:
-                st.write(f"Neutral-margin applied: `{result.decision.neutral_margin_applied}`")
-                st.write(f"Directional minus neutral margin: `{result.decision.neutral_margin_gap:.3f}`")
             st.caption(
                 "This system provides decision-support evidence, not trading instructions. "
                 "The final confidence is the fused probability assigned to the displayed final label."
@@ -300,7 +297,6 @@ def main() -> None:
             chunk_overlap = st.number_input("Chunk overlap", min_value=0, max_value=80, value=DEFAULT_CHUNK_OVERLAP, step=5)
         st.divider()
         st.caption("Final model: FinBERT + Qwen3-4B neutral-aware LoRA r8.")
-        st.caption("Archived: general weighted fusion is retained only as an experiment, not a deployed mode.")
         st.caption("LoRA adapter: adapters/neutral_aware_lora_r8_full_raw_seed42")
 
     input_mode = st.radio("Input type", ["Text", "URL"], horizontal=True)

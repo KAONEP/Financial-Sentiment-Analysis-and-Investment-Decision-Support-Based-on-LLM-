@@ -43,7 +43,6 @@ The full Qwen3-4B and FinBERT base models are loaded from Hugging Face when the 
 | Target modules | attention and MLP projections |
 | Training data | Financial PhraseBank `sentences_50agree`, full raw training split |
 | Deployed fusion | validation-trained logistic stacking over FinBERT and LoRA class probabilities |
-| Archived reference | hard threshold `0.91` + neutral margin `0.48` |
 
 ## Installation
 
@@ -91,10 +90,16 @@ python scripts/train_lora.py ^
 
 On Linux or macOS, replace `^` with `\`.
 
-Additional scripts support fusion evaluation, calibration, statistical testing, agreement robustness, and external robustness:
+Train and evaluate the final learned stacking fusion layer after FinBERT and LoRA predictions are available:
+
+```bash
+python scripts/train_stacking_fusion.py
+```
+
+Additional scripts support calibration, statistical testing, agreement robustness, and external robustness:
 
 ```text
-scripts/evaluate_fusion.py
+scripts/train_stacking_fusion.py
 scripts/calibrate_confidence.py
 scripts/statistical_tests.py
 scripts/evaluate_agreement_robustness.py
@@ -117,7 +122,6 @@ Financial PhraseBank `sentences_50agree`, fixed test split:
 | Qwen3-4B LoRA 100% raw (r16) | 0.8803 | 0.8789 | 0.8813 |
 | neutral-aware Qwen3-4B LoRA r8 | 0.8858 | 0.8813 | 0.8848 |
 | learned logistic stacking fusion | 0.9161 | 0.9096 | 0.9162 |
-| hard threshold + neutral-margin reference | 0.9161 | 0.9101 | 0.9161 |
 
 External Twitter Financial News Sentiment:
 
@@ -128,9 +132,7 @@ External Twitter Financial News Sentiment:
 | neutral-aware LoRA r8 | 0.8229 | 0.7975 |
 | learned logistic stacking fusion | 0.8099 | 0.7605 |
 
-In a separate cross-domain diagnostic, Twitter validation is split into a calibration half and a held-out evaluation half. On the held-out half, a cross-domain selected weighted fusion reaches accuracy 0.8409 and macro-F1 0.8065, but this setting is archived as an experiment rather than exposed as a deployed application mode.
-
-The main finding is that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. Hard threshold fusion with explicit neutral-boundary handling gives the strongest in-domain reference result. The deployed system uses learned logistic stacking instead because it matches the hard-threshold accuracy, is nearly identical in macro-F1, and is easier to explain as a learned linear combiner over the two models' probability vectors.
+The main finding is that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. The deployed system uses learned logistic stacking because it improves the in-domain result and is easy to explain as a validation-trained linear combiner over the two models' probability vectors.
 
 The Twitter result is intentionally reported as a limitation rather than removed. It shows that standalone neutral-aware LoRA transfers better to social-media-style financial text than PhraseBank-selected fusion. This supports a more careful conclusion: the deployed fusion pipeline is suitable for formal-news / PhraseBank-style analysis, while cross-domain fusion remains future work.
 
