@@ -2,7 +2,7 @@
 
 ## Abstract
 
-Financial news sentiment analysis differs from general sentiment analysis because labels are often defined by likely investor impact rather than surface tone. This study examines whether parameter-efficient adaptation of an open-weight large language model improves financial sentiment classification, and whether fusion with a financial-domain encoder makes predictions more stable. Using Financial PhraseBank as the main dataset, we compare FinBERT, a strict supervised BERT baseline, zero-shot Qwen3-4B prompting, simple reasoning prompting, and Qwen3-4B with LoRA fine-tuning. We then evaluate LoRA under different training data sizes and label-balance conditions, and analyze rank/module ablations, calibration, statistical significance, higher-agreement robustness, and external robustness on Twitter Financial News Sentiment. The final system combines FinBERT, neutral-aware Qwen3-4B LoRA, learned probability fusion, URL extraction, long-article window aggregation, supporting excerpts, and LLM-generated investment-support insights. Results show that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. The final learned stacking fusion improves the in-domain result while remaining interpretable as a validation-trained linear combiner over FinBERT and LoRA probability vectors. External evaluation shows that this fusion layer should be understood as an in-domain formal-news method rather than a universal cross-domain solution.
+Financial news sentiment analysis differs from general sentiment analysis because labels are often defined by likely investor impact rather than surface tone. This study examines whether parameter-efficient adaptation of an open-weight large language model improves financial sentiment classification, and whether fusion with a financial-domain encoder makes predictions more stable. Using Financial PhraseBank as the main dataset, we compare FinBERT, a strict supervised BERT baseline, zero-shot Qwen3-4B prompting, simple reasoning prompting, and Qwen3-4B with LoRA fine-tuning. We then evaluate LoRA under different training data sizes and label-balance conditions, and analyze rank/module ablations, calibration, statistical significance, higher-agreement robustness, and external formal-news robustness on `NOSIBLE/financial-sentiment`. The final system combines FinBERT, neutral-aware Qwen3-4B LoRA, learned probability fusion, URL extraction, long-article window aggregation, supporting excerpts, and LLM-generated investment-support insights. Results show that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting, and that this improvement transfers to a 100,000-example formal-news external set. The final learned stacking fusion improves the in-domain result while remaining interpretable as a validation-trained linear combiner over FinBERT and LoRA probability vectors. External evaluation shows that standalone neutral-aware LoRA is the strongest transfer model, while the learned fusion layer should be understood as an in-domain method rather than a universally portable rule.
 
 ## 1. Introduction
 
@@ -16,7 +16,7 @@ The main contributions are:
 
 1. A systematic evaluation of Qwen3-4B LoRA fine-tuning on Financial PhraseBank under different data-size and label-balance conditions.
 2. A learned logistic-stacking fusion method combining FinBERT and LoRA-adapted Qwen3-4B probabilities.
-3. Robustness and reliability analyses including multi-seed checks, calibration, statistical testing, higher-agreement subsets, and external Twitter Financial News evaluation.
+3. Robustness and reliability analyses including multi-seed checks, calibration, statistical testing, higher-agreement subsets, and a full external formal-news evaluation on `NOSIBLE/financial-sentiment`.
 4. Model understanding analyses based on error taxonomy, probability shifts, counterfactual probes, and hidden-state separability.
 5. An interactive financial sentiment and investment-support prototype with text and URL input, long-article processing, and evidence-based explanations.
 
@@ -42,7 +42,7 @@ The resulting split contains 3,392 training examples, 727 validation examples, a
 
 To study the effect of training data size and label balance, the project creates LoRA training subsets at 20%, 50%, and 100% of the training split. For each size, both the raw original label distribution and balanced undersampling are tested.
 
-External robustness is evaluated on Twitter Financial News Sentiment. Its Bearish, Neutral, and Bullish labels are mapped to negative, neutral, and positive, respectively.
+External formal-news robustness is evaluated on `NOSIBLE/financial-sentiment`, using its full 100,000-example train split as an evaluation-only external set. No model is retrained on NOSIBLE, and no fusion parameter is selected on NOSIBLE. The dataset includes text, label, source-domain, and URL fields, with 24,434 negative, 39,309 neutral, and 36,257 positive examples. The mean text length is 92.6 words, and major sources include Yahoo Finance, PR Newswire, Benzinga, BusinessWire, CNBC, and Nasdaq.
 
 ### 3.2 Baselines
 
@@ -98,13 +98,13 @@ This document-level processing is an engineering extension of a sentence-level c
 
 Experiments are run on a CUDA-capable 16 GB consumer GPU. Qwen3-4B is loaded in bfloat16, and gradient checkpointing is used during LoRA training.
 
-The evaluation follows common practice in financial sentiment classification by reporting both overall and class-sensitive metrics, including accuracy, macro-F1, weighted-F1, per-class precision and recall, and confusion matrices. Additional reliability and robustness analyses include ECE, Brier score, temperature scaling, multi-seed stability, paired bootstrap, McNemar testing, higher-agreement Financial PhraseBank subsets, external Twitter Financial News evaluation, error taxonomy, counterfactual probes, and hidden-state separability analysis.
+The evaluation follows common practice in financial sentiment classification by reporting both overall and class-sensitive metrics, including accuracy, macro-F1, weighted-F1, per-class precision and recall, and confusion matrices. Additional reliability and robustness analyses include ECE, Brier score, temperature scaling, multi-seed stability, paired bootstrap, McNemar testing, higher-agreement Financial PhraseBank subsets, external formal-news evaluation, error taxonomy, counterfactual probes, and hidden-state separability analysis.
 
 Macro-F1 is emphasized because Financial PhraseBank is class-imbalanced and neutral-heavy. Accuracy and weighted-F1 are still reported for comparability with benchmark-style results. The validation split is used for selecting learned-stacking parameters and calibration parameters; the test split is reserved for final reporting.
 
 ## 5. Results
 
-The results should be read with a clear domain distinction. Financial PhraseBank is the main benchmark and target style for the prototype: formal financial statements and news sentences labeled from an investor-impact perspective. Twitter Financial News Sentiment is used only as an external robustness check. PhraseBank therefore determines the main model-selection story, while Twitter tests how far that story transfers.
+The results should be read with a clear domain distinction. Financial PhraseBank is the main benchmark and target style for the prototype: formal financial statements and news sentences labeled from an investor-impact perspective. `NOSIBLE/financial-sentiment` is used as the main external formal-news robustness check. Twitter Financial News Sentiment is treated as an archived exploratory diagnostic because its short social-media style is outside the primary deployment setting.
 
 ### 5.1 Baseline Results
 
@@ -169,18 +169,19 @@ The deployed prototype uses learned logistic stacking. It improves over both Fin
 
 Scores increase as annotation agreement becomes stricter, which is expected because high-agreement samples are less ambiguous. Standalone LoRA performs very well on the clearest examples, supporting the conclusion that LoRA improves the LLM's alignment with investor-perspective labels.
 
-### 5.7 External Robustness
+### 5.7 External Formal-News Robustness
 
-On Twitter Financial News Sentiment, LoRA transfers much better than FinBERT:
+On the full `NOSIBLE/financial-sentiment` external set, neutral-aware LoRA transfers substantially better than FinBERT:
 
-| Method | Accuracy | Macro-F1 |
-|---|---:|---:|
-| FinBERT | 0.7253 | 0.6682 |
-| LoRA r8 | 0.8137 | 0.7895 |
-| neutral-aware LoRA r8 | 0.8229 | 0.7975 |
-| learned logistic stacking fusion | 0.8099 | 0.7605 |
+| Method | Accuracy | Macro-F1 | Weighted-F1 |
+|---|---:|---:|---:|
+| FinBERT | 0.7255 | 0.7289 | 0.7259 |
+| neutral-aware LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
+| learned logistic stacking fusion | 0.7435 | 0.7405 | 0.7436 |
 
-However, learned stacking does not transfer better than standalone neutral-aware LoRA to this Twitter distribution. This does not invalidate the in-domain fusion result, because Twitter Financial News Sentiment contains short ticker-oriented posts and social-media phrasing rather than formal news sentences. It does mean that the deployed fusion method should not be described as a universal cross-domain solution.
+The paired comparison also supports this difference. Compared with FinBERT, neutral-aware LoRA corrects 16,244 examples that FinBERT gets wrong while losing 10,495 examples that FinBERT gets right, giving an accuracy gain of 0.0575 and a macro-F1 gain of 0.0528. The fixed learned stacking fusion also improves over FinBERT, but it is weaker than standalone LoRA on this external set. Compared with LoRA, the stacker loses 10,562 examples and fixes 6,612 examples, giving an accuracy difference of -0.0395 and a macro-F1 difference of -0.0412.
+
+Length-based analysis shows an additional limitation. LoRA is strongest on short and medium formal-news snippets: macro-F1 is 0.8280 for texts with 50 words or fewer and 0.7952 for 51-150 words. On 151-300 word inputs, macro-F1 drops to 0.5796. This likely reflects the mismatch between sentence-level PhraseBank training and longer article-style inputs, and supports the need for the system's window-based long-article handling.
 
 ### 5.8 Evaluation Coverage
 
@@ -199,7 +200,7 @@ The experimental design covers the evaluation axes commonly expected in financia
 | Confidence reliability | ECE, Brier score, and temperature scaling |
 | Statistical testing | McNemar test and paired bootstrap confidence intervals |
 | In-domain robustness | Higher-agreement Financial PhraseBank subsets |
-| External robustness | Twitter Financial News Sentiment |
+| External robustness | Full NOSIBLE formal-news evaluation |
 | Model understanding | Error taxonomy, probability shifts, counterfactual probes, and hidden-state separability |
 
 This coverage supports the project's positioning as a research-oriented system prototype. The main remaining gap is document-level quantitative evaluation: the system handles long articles through window aggregation, but the supervised evaluation is still sentence-level because Financial PhraseBank is sentence-level.
@@ -228,17 +229,17 @@ The experiments support several conclusions. First, LoRA adaptation is needed be
 
 The deployed system uses learned logistic stacking because it improves the in-domain result while keeping the fusion rule simple: the final probabilities are produced by a validation-trained linear model over the two probability vectors.
 
-The Twitter check is kept because it prevents overclaiming. It shows that any fusion layer selected on PhraseBank validation must be treated as in-domain rather than universally robust. Optimizing further on Twitter would require a different experimental question, such as multi-domain calibration or domain-adaptive fusion, and would broaden the project beyond the current sub-theme.
+The NOSIBLE check prevents overclaiming. It shows that LoRA provides the strongest external formal-news transfer, while any fusion layer selected on PhraseBank validation should be treated as in-domain rather than universally robust. Optimizing fusion for external transfer would require a different experimental question, such as multi-domain calibration or domain-adaptive fusion.
 
 The model-understanding analyses show that the remaining difficulty is not basic sentiment polarity but neutral-boundary ambiguity. This is a meaningful limitation because many financial news items report factual events whose investor impact is debatable or delayed.
 
 ## 9. Limitations
 
-This study has several limitations. Financial PhraseBank is small and mostly sentence-level, while real financial articles are longer and more complex. The off-the-shelf FinBERT reference baseline is not leakage-free with respect to Financial PhraseBank, although the project includes a strict supervised BERT baseline to address this concern. The learned stacking layer is selected on validation data, which reduces direct test-set overfitting but does not guarantee cross-domain portability. The confidence score is derived from model probabilities and should not be interpreted as a fully calibrated correctness probability; calibration results are therefore reported separately. The long-article system has not yet been quantitatively validated on a document-level labeled dataset. Finally, the hidden-state analysis provides diagnostic evidence, not full mechanistic interpretability.
+This study has several limitations. Financial PhraseBank is small and mostly sentence-level, while real financial articles are longer and more complex. The off-the-shelf FinBERT reference baseline is not leakage-free with respect to Financial PhraseBank, although the project includes a strict supervised BERT baseline to address this concern. The learned stacking layer is selected on validation data, which reduces direct test-set overfitting but does not guarantee cross-domain portability; on NOSIBLE, standalone LoRA transfers better than the fixed stacker. The confidence score is derived from model probabilities and should not be interpreted as a fully calibrated correctness probability; calibration results are therefore reported separately. The long-article system has not yet been quantitatively validated on a document-level labeled dataset. Finally, the hidden-state analysis provides diagnostic evidence, not full mechanistic interpretability.
 
 ## 10. Conclusion
 
-This study shows that LoRA fine-tuning can adapt an open-weight LLM to investor-perspective financial sentiment analysis. Qwen3-4B LoRA improves clearly over zero-shot prompting and outperforms a strict supervised BERT baseline on the fixed Financial PhraseBank test split. Learned logistic stacking combines FinBERT and LoRA probabilities into the final deployed fusion method. Robustness and model-understanding analyses show that the main remaining challenges are neutral-boundary ambiguity and fusion portability under distribution shift. The final prototype applies the selected model pipeline to financial news text and URL analysis, returning sentiment, confidence, supporting excerpts, and investment-support insight.
+This study shows that LoRA fine-tuning can adapt an open-weight LLM to investor-perspective financial sentiment analysis. Qwen3-4B LoRA improves clearly over zero-shot prompting, outperforms a strict supervised BERT baseline on the fixed Financial PhraseBank test split, and transfers better than FinBERT to the full NOSIBLE formal-news external set. Learned logistic stacking combines FinBERT and LoRA probabilities into the final deployed in-domain fusion method. Robustness and model-understanding analyses show that the main remaining challenges are neutral-boundary ambiguity, longer-text handling, and fusion portability under distribution shift. The final prototype applies the selected model pipeline to financial news text and URL analysis, returning sentiment, confidence, supporting excerpts, and investment-support insight.
 
 ## References
 
@@ -253,6 +254,8 @@ Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On Calibration of Mode
 Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., & Chen, W. (2021). LoRA: Low-Rank Adaptation of Large Language Models.
 
 Malo, P., Sinha, A., Korhonen, P., Wallenius, J., & Takala, P. (2014). Good Debt or Bad Debt: Detecting Semantic Orientations in Economic Texts. Journal of the Association for Information Science and Technology.
+
+NOSIBLE. Financial Sentiment Dataset. Hugging Face Datasets.
 
 Qwen Team. (2025). Qwen3 Technical Report.
 

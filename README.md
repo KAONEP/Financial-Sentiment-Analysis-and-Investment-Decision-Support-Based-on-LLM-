@@ -103,13 +103,14 @@ scripts/train_stacking_fusion.py
 scripts/calibrate_confidence.py
 scripts/statistical_tests.py
 scripts/evaluate_agreement_robustness.py
-scripts/prepare_external_datasets.py
-scripts/evaluate_external_robustness.py
+scripts/prepare_nosible_external.py
+scripts/evaluate_stacking_fusion.py
+scripts/evaluate_formal_news_external.py
 ```
 
 ## Results
 
-The main target domain is formal financial news in the style of Financial PhraseBank. Twitter Financial News Sentiment is used as an external robustness check, not as the deployment target. This distinction matters because a fusion rule selected on PhraseBank validation can be strong for formal news while not being the best choice for short social-media-style financial posts.
+The main target domain is formal financial news in the style of Financial PhraseBank. `NOSIBLE/financial-sentiment` is used as the main external formal-news robustness check. Twitter Financial News Sentiment is treated as an archived exploratory diagnostic because its short social-media style is outside the primary deployment setting.
 
 Financial PhraseBank `sentences_50agree`, fixed test split:
 
@@ -123,18 +124,17 @@ Financial PhraseBank `sentences_50agree`, fixed test split:
 | neutral-aware Qwen3-4B LoRA r8 | 0.8858 | 0.8813 | 0.8848 |
 | learned logistic stacking fusion | 0.9161 | 0.9096 | 0.9162 |
 
-External Twitter Financial News Sentiment:
+External formal-news robustness on `NOSIBLE/financial-sentiment`, full 100,000-example evaluation set:
 
-| Method | Accuracy | Macro-F1 |
-|---|---:|---:|
-| FinBERT | 0.7253 | 0.6682 |
-| LoRA r8 | 0.8137 | 0.7895 |
-| neutral-aware LoRA r8 | 0.8229 | 0.7975 |
-| learned logistic stacking fusion | 0.8099 | 0.7605 |
+| Method | Accuracy | Macro-F1 | Weighted-F1 |
+|---|---:|---:|---:|
+| FinBERT | 0.7255 | 0.7289 | 0.7259 |
+| neutral-aware LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
+| learned logistic stacking fusion | 0.7435 | 0.7405 | 0.7436 |
 
-The main finding is that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting. The deployed system uses learned logistic stacking because it improves the in-domain result and is easy to explain as a validation-trained linear combiner over the two models' probability vectors.
+The main finding is that LoRA makes Qwen3-4B much better aligned with Financial PhraseBank than zero-shot prompting, and this improvement transfers to a large formal-news external dataset. The deployed system uses learned logistic stacking because it improves the in-domain Financial PhraseBank result and is easy to explain as a validation-trained linear combiner over the two models' probability vectors.
 
-The Twitter result is intentionally reported as a limitation rather than removed. It shows that standalone neutral-aware LoRA transfers better to social-media-style financial text than PhraseBank-selected fusion. This supports a more careful conclusion: the deployed fusion pipeline is suitable for formal-news / PhraseBank-style analysis, while cross-domain fusion remains future work.
+The NOSIBLE result also gives an important limitation: the fixed stacking layer selected on Financial PhraseBank validation improves over FinBERT externally, but it does not transfer as well as standalone neutral-aware LoRA. The correct claim is therefore not that fusion is universally best, but that LoRA provides the strongest external transfer while learned stacking is the best in-domain system choice.
 
 ## Research Report
 
@@ -150,7 +150,7 @@ It describes the dataset, baselines, LoRA training method, fusion strategy, cali
 
 - Financial PhraseBank is small and sentence-level, while real financial articles are longer and more complex.
 - `ProsusAI/finbert` is used as an off-the-shelf reference model and is not treated as a leakage-free supervised baseline for Financial PhraseBank.
-- The deployed learned fusion layer is selected on Financial PhraseBank validation data and does not transfer better than standalone LoRA on Twitter Financial News Sentiment.
+- The deployed learned fusion layer is selected on Financial PhraseBank validation data and does not transfer better than standalone LoRA on the full NOSIBLE formal-news external set.
 - Confidence is based on maximum softmax probability and should be interpreted as a model gating signal rather than a guaranteed correctness probability.
 - Long-article support is implemented through window aggregation; document-level quantitative validation remains future work.
 - The system is a research decision-support prototype and does not provide financial advice.
@@ -158,5 +158,7 @@ It describes the dataset, baselines, LoRA training method, fusion strategy, cali
 ## License And Data Notes
 
 Financial PhraseBank has non-commercial licensing constraints. Check the dataset license before redistributing data or using the system commercially.
+
+The NOSIBLE external dataset is loaded from its original Hugging Face dataset repository and is not redistributed in this repository.
 
 The included LoRA adapter is provided as a research artifact for this project. The base models are downloaded from their original Hugging Face repositories and are subject to their own licenses.
