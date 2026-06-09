@@ -31,6 +31,7 @@ reports/*
 !reports/report.md
 reports/*.pdf
 reports/*.docx
+local_archive/
 
 # Local notebooks and one-off analysis utilities
 notebooks/

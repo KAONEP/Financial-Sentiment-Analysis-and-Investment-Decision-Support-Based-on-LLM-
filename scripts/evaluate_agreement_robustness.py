@@ -28,21 +28,8 @@ MODEL_PATHS = {
     "FinBERT": "outputs/runs/finbert/test/predictions.csv",
     "LoRA_r16": "outputs/runs/Qwen__Qwen3-4B/lora/train_frac100_raw/direct/test/predictions.csv",
     "LoRA_r8": "outputs/runs/Qwen__Qwen3-4B/lora/ablation_lora_r8_full_raw_seed42/direct/test/predictions.csv",
-    "Fusion_r16_threshold": "outputs/runs/fusion/finbert_qwen3_lora100_raw/threshold/test/predictions.csv",
-    "Fusion_r16_weighted": "outputs/runs/fusion/finbert_qwen3_lora100_raw/weighted/test/predictions.csv",
-    "Fusion_r16_threshold_calibrated": (
-        "outputs/runs/fusion/finbert_qwen3_lora100_raw_calibrated/threshold/test/predictions.csv"
-    ),
-    "Fusion_r16_weighted_calibrated": (
-        "outputs/runs/fusion/finbert_qwen3_lora100_raw_calibrated/weighted/test/predictions.csv"
-    ),
-    "Fusion_r8_threshold": "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42/threshold/test/predictions.csv",
-    "Fusion_r8_weighted": "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42/weighted/test/predictions.csv",
-    "Fusion_r8_threshold_calibrated": (
-        "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42_calibrated/threshold/test/predictions.csv"
-    ),
-    "Fusion_r8_weighted_calibrated": (
-        "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42_calibrated/weighted/test/predictions.csv"
+    "NeutralAware_LoRA_r8": (
+        "outputs/runs/Qwen__Qwen3-4B/lora/neutral_aware_lora_r8_full_raw_seed42/neutral_aware/test/predictions.csv"
     ),
 }
 
@@ -50,10 +37,9 @@ COMPARISONS = [
     ("FinBERT", "Strict_BERT"),
     ("FinBERT", "LoRA_r16"),
     ("FinBERT", "LoRA_r8"),
-    ("FinBERT", "Fusion_r16_weighted"),
-    ("FinBERT", "Fusion_r8_threshold_calibrated"),
+    ("FinBERT", "NeutralAware_LoRA_r8"),
     ("LoRA_r16", "LoRA_r8"),
-    ("Fusion_r16_weighted", "Fusion_r8_threshold_calibrated"),
+    ("LoRA_r8", "NeutralAware_LoRA_r8"),
 ]
 
 
@@ -240,9 +226,9 @@ test_allagree = current_test_split intersect Sentences_AllAgree.txt
 
 ## Interpretation
 
-The scores increase as annotation agreement becomes stricter, which is expected because higher-agreement examples are less ambiguous. The selected r8 fusion and the earlier r16 fusion settings remain stronger than FinBERT across all agreement levels, so the main fusion-over-FinBERT conclusion is robust to label-noise reduction.
+The scores increase as annotation agreement becomes stricter, which is expected because higher-agreement examples are less ambiguous. This supports the interpretation that a substantial part of the remaining error comes from annotation-boundary ambiguity rather than simple polarity confusion.
 
-The r8 configuration is more competitive than the original r16 setting across the agreement levels, especially when used with threshold fusion. On `75agree_test` and `allagree_test`, standalone `LoRA_r8` is extremely strong and can slightly exceed fusion in macro-F1 while matching or nearly matching fusion in accuracy. This suggests that the clearest high-agreement examples leave less room for FinBERT-LoRA complementarity. Therefore, the final report should state that fusion is the strongest overall method on the full and 66-agreement test sets, remains tied or competitive on higher-agreement samples, and consistently improves over FinBERT.
+The LoRA models remain competitive across the higher-agreement subsets. The neutral-aware rank-8 LoRA model is the final mainline model because it keeps the efficient adapter setting while explicitly reducing over-directional predictions near the neutral boundary. The agreement robustness check should therefore be reported as supporting evidence for the LoRA-only research story, not as a separate deployed decision rule.
 """
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")

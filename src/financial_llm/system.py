@@ -5,7 +5,6 @@ import re
 
 import numpy as np
 
-from .fusion import logistic_stacking_fusion
 from .labels import LABELS
 
 
@@ -94,26 +93,24 @@ def prediction_from_probs(probs: np.ndarray, model_name: str) -> SentimentModelO
     )
 
 
-def learned_stacking_fusion(
+def lora_only_decision(
     finbert_probs: np.ndarray,
     llm_probs: np.ndarray,
 ) -> SentimentDecision:
-    fused_probs = logistic_stacking_fusion(
-        llm_probs.reshape(1, -1),
-        finbert_probs.reshape(1, -1),
-    )[0]
-    base_idx = int(np.argmax(fused_probs))
+    _ = finbert_probs
+    final_probs = np.asarray(llm_probs, dtype=np.float64)
+    base_idx = int(np.argmax(final_probs))
     base_label = LABELS[base_idx]
-    base_confidence = float(fused_probs[base_idx])
+    base_confidence = float(final_probs[base_idx])
     trace = (
-        "Learned stacking fusion combined FinBERT and LoRA class probabilities "
-        "through a validation-trained multinomial logistic regression."
+        "The final decision uses the neutral-aware Qwen3-4B LoRA classifier. "
+        "FinBERT is shown as a reference baseline but is not used to change the final label."
     )
     return SentimentDecision(
-        mode="learned_stacking",
+        mode="lora_only",
         label=base_label,
         confidence=base_confidence,
-        probabilities=fused_probs,
+        probabilities=final_probs,
         base_label=base_label,
         base_confidence=base_confidence,
         trace=trace,
@@ -301,8 +298,8 @@ def should_use_document_mode(text: str, threshold_words: int = DEFAULT_LONG_TEXT
 
 
 def decide_from_probabilities(finbert_probs: np.ndarray, llm_probs: np.ndarray, mode: str) -> SentimentDecision:
-    if mode == "learned_stacking":
-        return learned_stacking_fusion(finbert_probs, llm_probs)
+    if mode == "lora_only":
+        return lora_only_decision(finbert_probs, llm_probs)
     raise ValueError(f"Unsupported mode: {mode}")
 
 
@@ -353,7 +350,7 @@ def build_document_explanation(result: DocumentSentimentResult, mode: str) -> st
     counts = {label: sum(1 for chunk in result.chunks if chunk.decision.label == label) for label in LABELS}
     evidence_ids = ", ".join(str(chunk.chunk_id + 1) for chunk in result.top_evidence)
     explanation = (
-        f"The article was split into {len(result.chunks)} chunks and each chunk was analyzed with FinBERT, LoRA, and fusion. "
+        f"The article was split into {len(result.chunks)} chunks and each chunk was analyzed with the LoRA classifier, with FinBERT retained as a reference baseline. "
         f"Chunk labels were negative={counts['negative']}, neutral={counts['neutral']}, positive={counts['positive']}. "
         f"The document-level probabilities are confidence-weighted across chunks, using mode `{mode}`. "
         f"The strongest evidence chunks are: {evidence_ids}."

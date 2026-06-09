@@ -5,6 +5,4 @@ __all__ = [
     "data",
     "metrics",
     "prompts",
-    "fusion",
 ]
-

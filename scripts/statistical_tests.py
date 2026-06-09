@@ -17,19 +17,13 @@ from financial_llm.labels import LABELS
 
 DEFAULT_MODELS = {
     "FinBERT": "outputs/runs/finbert/test/predictions.csv",
-    "LoRA_r8": "outputs/runs/Qwen__Qwen3-4B/lora/ablation_lora_r8_full_raw_seed42/direct/test/predictions.csv",
-    "Fusion_r8_threshold": "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42/threshold/test/predictions.csv",
-    "Fusion_r8_threshold_calibrated": (
-        "outputs/runs/fusion/finbert_qwen3_lora_r8_full_raw_seed42_calibrated/threshold/test/predictions.csv"
+    "neutral_aware_LoRA_r8": (
+        "outputs/runs/Qwen__Qwen3-4B/lora/neutral_aware_lora_r8_full_raw_seed42/neutral_aware/test/predictions.csv"
     ),
 }
 
 DEFAULT_COMPARISONS = [
-    ("FinBERT", "LoRA_r8"),
-    ("FinBERT", "Fusion_r8_threshold"),
-    ("FinBERT", "Fusion_r8_threshold_calibrated"),
-    ("LoRA_r8", "Fusion_r8_threshold_calibrated"),
-    ("Fusion_r8_threshold", "Fusion_r8_threshold_calibrated"),
+    ("FinBERT", "neutral_aware_LoRA_r8"),
 ]
 
 
@@ -166,7 +160,7 @@ This report checks whether the main test-set improvements are supported by paire
 
 ## Interpretation
 
-The key comparison is `FinBERT` versus `Fusion_r8_threshold_calibrated`. If the bootstrap confidence interval for macro-F1 is entirely above zero and the paired correctness test is small, the improvement is more defensible than a single metric table. If a comparison crosses zero, it should be described as suggestive rather than statistically secure.
+The key comparison is `FinBERT` versus `neutral_aware_LoRA_r8`. If the bootstrap confidence interval for macro-F1 is entirely above zero and the paired correctness test is small, the improvement is more defensible than a single metric table. If a comparison crosses zero, it should be described as suggestive rather than statistically secure.
 """
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")

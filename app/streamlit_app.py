@@ -27,7 +27,7 @@ from financial_llm.system import (
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ADAPTER_PATH = BASE_DIR / "adapters" / "neutral_aware_lora_r8_full_raw_seed42"
-DEPLOYED_MODE = "learned_stacking"
+DEPLOYED_MODE = "lora_only"
 CHUNK_STRATEGY_OPTIONS = {
     "Balanced (recommended)": {
         "robust_multiscale": True,
@@ -96,9 +96,8 @@ def clean_text(text: str) -> str:
 def probability_frame(result) -> pd.DataFrame:
     rows = []
     for source, output in [
-        ("FinBERT", result.finbert),
-        ("Qwen3-4B LoRA", result.llm),
-        ("Final fusion", result.decision),
+        ("FinBERT reference", result.finbert),
+        ("Qwen3-4B LoRA final", result.llm),
     ]:
         probs = output.probabilities
         rows.append(
@@ -107,8 +106,8 @@ def probability_frame(result) -> pd.DataFrame:
                 "negative": float(probs[LABELS.index("negative")]),
                 "neutral": float(probs[LABELS.index("neutral")]),
                 "positive": float(probs[LABELS.index("positive")]),
-                "prediction": output.prediction if source != "Final fusion" else result.decision.label,
-                "confidence": output.confidence if source != "Final fusion" else result.decision.confidence,
+                "prediction": output.prediction,
+                "confidence": output.confidence,
             }
         )
     return pd.DataFrame(rows)
@@ -191,12 +190,12 @@ def render_result(result, investment_support: str | None = None) -> None:
             st.bar_chart(chart_df)
         with trace_tab:
             st.write(result.explanation)
-            st.write(f"Fusion method: `{result.decision.mode}`")
-            st.write(f"Base fusion label: `{result.decision.base_label}`")
-            st.write(f"Base fusion confidence: `{result.decision.base_confidence:.3f}`")
+            st.write(f"Decision mode: `{result.decision.mode}`")
+            st.write(f"Final label: `{result.decision.label}`")
+            st.write(f"Final confidence: `{result.decision.confidence:.3f}`")
             st.caption(
                 "This system provides decision-support evidence, not trading instructions. "
-                "The final confidence is the fused probability assigned to the displayed final label."
+                "The final confidence is the LoRA probability assigned to the displayed final label."
             )
 
 
@@ -205,7 +204,7 @@ def render_document_result(result, investment_support: str | None = None) -> Non
     metric_cols[0].metric("Document sentiment", result.label)
     metric_cols[1].metric("Document confidence", f"{result.confidence:.3f}")
     metric_cols[2].metric("Chunks analyzed", str(len(result.chunks)))
-    metric_cols[3].metric("Fusion", result.mode)
+    metric_cols[3].metric("Decision mode", result.mode)
     if result.stable_across_scales is None:
         metric_cols[4].metric("Chunk stability", "single-scale")
     else:
@@ -267,7 +266,7 @@ def main() -> None:
     with st.sidebar:
         st.header("Model pipeline")
         mode = DEPLOYED_MODE
-        st.caption("Fusion: validation-trained logistic stacking over FinBERT and Qwen3-4B LoRA probabilities.")
+        st.caption("Final classifier: neutral-aware Qwen3-4B LoRA. FinBERT is shown as a reference baseline.")
         st.divider()
         document_mode = st.toggle(
             "Auto chunk long articles",
@@ -296,7 +295,7 @@ def main() -> None:
                 chunk_words = st.number_input("Chunk words", min_value=60, max_value=220, value=DEFAULT_CHUNK_WORDS, step=10)
             chunk_overlap = st.number_input("Chunk overlap", min_value=0, max_value=80, value=DEFAULT_CHUNK_OVERLAP, step=5)
         st.divider()
-        st.caption("Final model: FinBERT + Qwen3-4B neutral-aware LoRA r8.")
+        st.caption("Final model: Qwen3-4B neutral-aware LoRA r8.")
         st.caption("LoRA adapter: adapters/neutral_aware_lora_r8_full_raw_seed42")
 
     input_mode = st.radio("Input type", ["Text", "URL"], horizontal=True)
@@ -323,7 +322,7 @@ def main() -> None:
             finbert = load_finbert()
             lora = load_lora_classifier()
             if use_document_analysis:
-                with st.spinner("Running chunk-level FinBERT, Qwen3-4B LoRA, and document aggregation..."):
+                with st.spinner("Running chunk-level LoRA classification and document aggregation..."):
                     result = analyze_document_with_models(
                         text,
                         finbert,
@@ -340,7 +339,7 @@ def main() -> None:
                         support = generate_llm_investment_support_for_document(result, lora)
                 render_document_result(result, support)
             else:
-                with st.spinner("Running FinBERT, Qwen3-4B LoRA, and fusion..."):
+                with st.spinner("Running Qwen3-4B LoRA sentiment classification..."):
                     result = analyze_with_models(text, finbert, lora, mode)
                 support = None
                 if generate_support:

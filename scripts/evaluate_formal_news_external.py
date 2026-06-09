@@ -25,10 +25,6 @@ DEFAULT_PREDICTIONS = [
         "neutral-aware LoRA r8",
         "outputs/runs/external/nosible_financial_sentiment_full/neutral_aware_lora_r8/test/predictions.csv",
     ),
-    (
-        "fixed learned stacking fusion",
-        "outputs/analysis/external_formal_news/nosible_financial_sentiment_full/learned_stacking/predictions.csv",
-    ),
 ]
 
 
@@ -246,7 +242,7 @@ def main() -> None:
 
 ## Dataset
 
-This external check uses `NOSIBLE/financial-sentiment`, a Hugging Face financial sentiment dataset with text, label, source-domain, and URL fields. The dataset is used only for evaluation. No model is retrained on this dataset, and the fixed learned stacking layer remains the one selected on Financial PhraseBank validation predictions.
+This external check uses `NOSIBLE/financial-sentiment`, a Hugging Face financial sentiment dataset with text, label, source-domain, and URL fields. The dataset is used only for evaluation. No model is retrained on this dataset.
 
 Rows evaluated: {len(merged)}
 
@@ -270,7 +266,7 @@ Differences are reported as `model_b - model_a`. McNemar tests compare paired co
 
 ## Interpretation
 
-This check is closer to the target system setting than the archived Twitter diagnostic because the inputs are formal financial news snippets and article excerpts. If neutral-aware LoRA remains stronger than FinBERT on this dataset, it supports the claim that LoRA improves formal financial sentiment transfer beyond the Financial PhraseBank split. If the fixed learned stacking layer does not transfer as well as standalone LoRA, it should be framed as an in-domain fusion layer selected on Financial PhraseBank validation rather than a universally portable fusion rule.
+This check is closer to the target system setting than the archived Twitter diagnostic because the inputs are formal financial news snippets and article excerpts. If neutral-aware LoRA remains stronger than FinBERT on this dataset, it supports the claim that LoRA improves formal financial sentiment transfer beyond the Financial PhraseBank split.
 """
     (output_dir / "report.md").write_text(report, encoding="utf-8")
     print(json.dumps(summary["overall"], indent=2))
