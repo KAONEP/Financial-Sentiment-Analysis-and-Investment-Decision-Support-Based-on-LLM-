@@ -14,7 +14,7 @@ The main contributions are:
 
 1. A controlled comparison of Qwen3-4B direct prompting, reasoning prompting, supervised BERT, FinBERT, and Qwen3-4B LoRA on Financial PhraseBank.
 2. A data-condition study of LoRA under 20%, 50%, and 100% training data, with raw versus balanced label distributions.
-3. LoRA design checks covering rank and target modules, leading to a neutral-aware rank-8 attention+MLP adapter.
+3. LoRA design checks covering rank, target modules, dropout, learning rate, and seed sensitivity, leading to a neutral-aware rank-8 attention+MLP adapter.
 4. Robustness analysis on higher-agreement Financial PhraseBank subsets and a full 100,000-example NOSIBLE formal-news external set.
 5. Model-understanding analysis covering neutral-boundary errors, probability shifts, counterfactual probes, and hidden-state separability.
 6. A Streamlit decision-support prototype for text and URL-based financial news analysis.
@@ -156,15 +156,30 @@ Prompt-only Qwen3-4B is below FinBERT and the strict supervised baseline. This m
 
 The raw training distribution improves consistently as data size increases. Balanced undersampling helps some minority behavior but reduces stability on the naturally neutral-heavy test distribution.
 
-### 6.3 LoRA Ablation
+### 6.3 LoRA Ablation And Final Model Selection
 
-| Run | Adapter params | Test Accuracy | Test Macro-F1 |
+The first ablation stage changed one design factor at a time around the neutral-aware rank-8 LoRA setting. The grid included rank, target modules, dropout, learning rate, and seed checks. The strongest single-seed test result came from MLP-only LoRA, but final selection should not be based on a single test result.
+
+| Run | Validation Macro-F1 | Test Accuracy | Test Macro-F1 |
 |---|---:|---:|---:|
-| r16 attention+MLP | 33,030,144 | 0.8803 | 0.8789 |
-| r8 attention+MLP | 16,515,072 | 0.8831 | 0.8813 |
-| r16 attention-only | 11,796,480 | 0.8721 | 0.8713 |
+| r4 attention+MLP, dropout 0.05, lr 1e-4 | 0.8674 | 0.8858 | 0.8792 |
+| r8 attention+MLP, dropout 0.05, lr 1e-4 | 0.8783 | 0.8858 | 0.8813 |
+| r16 attention+MLP, dropout 0.05, lr 1e-4 | 0.8755 | 0.8721 | 0.8723 |
+| r8 attention-only, dropout 0.05, lr 1e-4 | 0.8641 | 0.8817 | 0.8741 |
+| r8 MLP-only, dropout 0.05, lr 1e-4 | 0.8758 | 0.8900 | 0.8844 |
+| r8 attention+MLP, dropout 0.10, lr 1e-4 | 0.8804 | 0.8831 | 0.8814 |
+| r8 attention+MLP, dropout 0.05, lr 2e-4 | 0.8848 | 0.8858 | 0.8792 |
 
-Rank-8 attention+MLP is selected because it gives a good efficiency-performance trade-off. Attention-only adaptation is lighter but weaker.
+The second stage repeated the main candidate families across three seeds and selected by validation behavior rather than by a single test score.
+
+| Candidate family | Val Macro-F1 Mean | Val Macro-F1 Std | Test Macro-F1 Mean | Test Accuracy Mean |
+|---|---:|---:|---:|---:|
+| r8 attention+MLP, dropout 0.05, lr 2e-4 | 0.8727 | 0.0130 | 0.8650 | 0.8735 |
+| r8 attention+MLP, dropout 0.10, lr 1e-4 | 0.8703 | 0.0128 | 0.8715 | 0.8771 |
+| r8 MLP-only, dropout 0.05, lr 1e-4 | 0.8694 | 0.0109 | 0.8766 | 0.8817 |
+| r8 attention+MLP, dropout 0.05, lr 1e-4 | 0.8693 | 0.0125 | 0.8729 | 0.8780 |
+
+The learning-rate 2e-4 candidate has the highest validation mean, but it has the weakest mean test result. The MLP-only candidate has the best mean test macro-F1 and fewer trainable parameters, but an external NOSIBLE check shows it is slightly weaker than the current attention+MLP adapter on formal-news transfer. Therefore the deployed model is not changed. The final choice remains `neutral_aware_lora_r8_full_raw_seed42`, because it has the best external robustness among the checked deployable candidates and avoids replacing the system based on a small in-domain test gain.
 
 ### 6.4 Neutral-Aware LoRA
 
@@ -188,14 +203,17 @@ Scores increase as annotation agreement becomes stricter, which is expected beca
 
 ### 6.6 External Formal-News Robustness
 
-On the full `NOSIBLE/financial-sentiment` external set, neutral-aware LoRA transfers substantially better than FinBERT:
+On the full `NOSIBLE/financial-sentiment` external set, neutral-aware LoRA transfers substantially better than FinBERT. The MLP-only candidate from the final-selection ablation is also evaluated to check whether the best in-domain test variant should replace the deployed adapter.
 
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
 | neutral-aware Qwen3-4B LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
+| MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
 
 Paired comparison supports the difference: LoRA corrects 16,244 examples that FinBERT gets wrong while losing 10,495 examples that FinBERT gets right. The accuracy gain is 0.0575 and the macro-F1 gain is 0.0528.
+
+The MLP-only candidate is close but slightly below the deployed attention+MLP adapter on NOSIBLE: -0.0026 accuracy and -0.0047 macro-F1. This result supports keeping the current final model rather than chasing the highest single Financial PhraseBank test score.
 
 Length-bin analysis shows a remaining limitation. LoRA is strongest on short and medium formal-news snippets, with macro-F1 0.8280 for texts with 50 words or fewer and 0.7952 for 51-150 words. It drops to 0.5796 for 151-300 word inputs, which supports the need for window-based long-article processing.
 
@@ -210,7 +228,7 @@ Length-bin analysis shows a remaining limitation. LoRA is strongest on short and
 | Lightweight LLM adaptation | Qwen3-4B LoRA |
 | Data-size analysis | 20%, 50%, and 100% training subsets |
 | Label-balance analysis | Raw distribution versus balanced undersampling |
-| LoRA ablation | Rank and target-module comparisons |
+| LoRA ablation | Rank, target-module, dropout, learning-rate, and seed comparisons |
 | Confidence reliability | ECE, Brier score, and temperature scaling |
 | Statistical testing | McNemar test and paired bootstrap confidence intervals |
 | In-domain robustness | Higher-agreement Financial PhraseBank subsets |

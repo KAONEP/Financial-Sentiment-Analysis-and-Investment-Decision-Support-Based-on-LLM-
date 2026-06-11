@@ -9,6 +9,7 @@ The project combines:
 - `ProsusAI/finbert` as a financial-domain reference model.
 - Sentence-level evaluation on Financial PhraseBank.
 - External formal-news robustness evaluation on `NOSIBLE/financial-sentiment`.
+- Multi-seed LoRA model-selection checks covering rank, target modules, dropout, and learning rate.
 - A Streamlit interface for text and URL-based financial news analysis.
 
 ## Repository Structure
@@ -128,8 +129,9 @@ External formal-news robustness on `NOSIBLE/financial-sentiment`, full 100,000-e
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
 | neutral-aware Qwen3-4B LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
+| MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
 
-The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset.
+The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model: an MLP-only candidate had the best mean Financial PhraseBank test macro-F1 across the final seed check, but it was slightly weaker on the external formal-news evaluation.
 
 ## Research Report
 
@@ -139,7 +141,7 @@ The consolidated research report is available at:
 reports/report.md
 ```
 
-It describes the dataset, baselines, LoRA training method, data-size and label-balance experiments, LoRA ablations, calibration analysis, statistical testing, higher-agreement robustness, NOSIBLE external robustness, model-understanding analysis, system implementation, limitations, and references.
+It describes the dataset, baselines, LoRA training method, data-size and label-balance experiments, LoRA ablations, multi-seed final model selection, calibration analysis, statistical testing, higher-agreement robustness, NOSIBLE external robustness, model-understanding analysis, system implementation, limitations, and references.
 
 ## Limitations
 

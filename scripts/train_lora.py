@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -40,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-val-samples", type=int, default=None)
     parser.add_argument("--prompt-mode", default="direct", choices=["direct", "neutral_aware"])
     parser.add_argument("--label-smoothing-factor", type=float, default=0.0)
+    parser.add_argument("--resume-from-checkpoint", default=None)
+    parser.add_argument("--auto-resume", action="store_true")
     return parser.parse_args()
 
 
@@ -61,6 +64,22 @@ def parse_target_modules(value: str | None, fallback: list[str]) -> list[str]:
     if not modules:
         raise ValueError("--target-modules must contain at least one module name.")
     return modules
+
+
+def latest_checkpoint(output_dir: Path) -> str | None:
+    if not output_dir.exists():
+        return None
+    checkpoints = []
+    for path in output_dir.glob("checkpoint-*"):
+        if not path.is_dir():
+            continue
+        match = re.fullmatch(r"checkpoint-(\d+)", path.name)
+        if match is None:
+            continue
+        checkpoints.append((int(match.group(1)), path))
+    if not checkpoints:
+        return None
+    return str(max(checkpoints, key=lambda item: item[0])[1])
 
 
 def build_tokenized_dataset(
@@ -238,7 +257,10 @@ def main() -> None:
         train_dataset=train_ds,
         eval_dataset=val_ds,
     )
-    train_output = trainer.train()
+    resume_from_checkpoint = args.resume_from_checkpoint
+    if args.auto_resume and resume_from_checkpoint is None:
+        resume_from_checkpoint = latest_checkpoint(output_dir)
+    train_output = trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     trainer.save_model(str(output_dir / "final_adapter"))
     tokenizer.save_pretrained(str(output_dir / "final_adapter"))
     run_config = {
@@ -257,6 +279,7 @@ def main() -> None:
         "target_modules": target_modules,
         "prompt_mode": args.prompt_mode,
         "label_smoothing_factor": float(args.label_smoothing_factor),
+        "resume_from_checkpoint": resume_from_checkpoint,
         "trainable_params": trainable_params,
         "total_params": total_params,
         "trainable_percent": 100.0 * trainable_params / total_params,
