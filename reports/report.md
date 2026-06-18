@@ -128,6 +128,8 @@ Experiments report accuracy, macro-F1, weighted-F1, per-class precision and reca
 
 The validation split is used for model-selection decisions such as prompt/training configuration and calibration analysis. The test split is reserved for final Financial PhraseBank reporting. NOSIBLE is used only as an external evaluation set.
 
+The results distinguish between a concrete deployed checkpoint and configuration-level stability. The main deployed-model results report the seed42 LoRA adapter included in the repository and used by the system prototype. The 10-seed stability table reports the mean and standard deviation of the final LoRA configuration family, which checks whether the selected design is robust to random initialization and data-order effects.
+
 ## 6. Results
 
 ### 6.1 Baseline Results
@@ -184,13 +186,13 @@ After the 10-seed check, the attention+MLP adapter is slightly stronger on mean 
 | Method | Test Accuracy | Test Macro-F1 | Test Weighted-F1 | Errors | Neutral false direction | Missed directional |
 |---|---:|---:|---:|---:|---:|---:|
 | LoRA r8 original | 0.8831 | 0.8813 | 0.8828 | 85 | 41 | 44 |
-| LoRA r8 neutral-aware trained | 0.8858 | 0.8813 | 0.8848 | 83 | 33 | 50 |
+| LoRA r8 neutral-aware trained (seed42) | 0.8858 | 0.8813 | 0.8848 | 83 | 33 | 50 |
 
-Neutral-aware training reduces false directional predictions from neutral examples and becomes the final deployed classifier.
+Neutral-aware training reduces false directional predictions from neutral examples and becomes the final deployed classifier. This table reports the concrete seed42 checkpoint used by the prototype; the 10-seed table above reports configuration-level stability.
 
 ### 6.5 Agreement Robustness
 
-| Subset | FinBERT Macro-F1 | LoRA r8 Macro-F1 |
+| Subset | FinBERT Macro-F1 | LoRA r8 (seed42) Macro-F1 |
 |---|---:|---:|
 | 50agree test | 0.8650 | 0.8813 |
 | 66agree test | 0.8936 | 0.9214 |
@@ -206,7 +208,7 @@ On the full `NOSIBLE/financial-sentiment` external set, neutral-aware LoRA trans
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
-| neutral-aware Qwen3-4B LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
+| Deployed Qwen3-4B LoRA r8 (seed42) | 0.7830 | 0.7817 | 0.7827 |
 | MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
 
 Paired comparison supports the difference: LoRA corrects 16,244 examples that FinBERT gets wrong while losing 10,495 examples that FinBERT gets right. The accuracy gain is 0.0575 and the macro-F1 gain is 0.0528.
