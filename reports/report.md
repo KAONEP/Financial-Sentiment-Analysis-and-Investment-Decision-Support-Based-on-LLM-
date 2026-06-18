@@ -235,6 +235,20 @@ Length-bin analysis shows a remaining limitation. LoRA is strongest on short and
 | External robustness | Full NOSIBLE formal-news evaluation |
 | Model understanding | Error taxonomy, probability shifts, counterfactual probes, hidden-state separability |
 
+### 6.8 Result Figures
+
+The following figures summarize the main empirical claims and the deployed system pipeline.
+
+![Main Financial PhraseBank Macro-F1 comparison](../figures/fig_main_performance_macro_f1.png)
+
+![LoRA data-size and label-balance study](../figures/fig_lora_data_size_balance.png)
+
+![10-seed LoRA stability check](../figures/fig_lora_10seed_stability.png)
+
+![NOSIBLE external formal-news robustness](../figures/fig_external_robustness.png)
+
+![System inference pipeline](../figures/fig_system_pipeline.png)
+
 ## 7. Model Understanding
 
 The main remaining errors are neutral-boundary errors rather than simple positive-versus-negative polarity flips. This means the model usually understands basic polarity, but still struggles to decide whether a factual financial event should be considered investor-directional under the dataset definition.

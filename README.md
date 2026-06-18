@@ -20,6 +20,7 @@ src/financial_llm/   reusable model, prompt, metric, and system code
 scripts/             data preparation, training, evaluation, and robustness scripts
 configs/             experiment configuration
 adapters/            final LoRA adapter used by the system
+figures/             report figures and figure-generation script
 reports/report.md    consolidated research report
 ```
 
@@ -143,6 +144,20 @@ Final 10-seed stability check on Financial PhraseBank:
 | r8 MLP-only, dropout 0.05, lr 1e-4 | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
 
 The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model. In the final 10-seed check, it is slightly stronger and slightly more stable than the MLP-only competitor on Financial PhraseBank, and it also performs better on the external formal-news evaluation.
+
+## Figures
+
+The report figures are available in `figures/` as both PDF and PNG files.
+
+![Main Financial PhraseBank performance](figures/fig_main_performance_macro_f1.png)
+
+![LoRA data-size and label-balance study](figures/fig_lora_data_size_balance.png)
+
+![10-seed LoRA stability check](figures/fig_lora_10seed_stability.png)
+
+![External formal-news robustness](figures/fig_external_robustness.png)
+
+![System pipeline](figures/fig_system_pipeline.png)
 
 ## Research Report
 
