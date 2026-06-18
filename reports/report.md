@@ -165,19 +165,19 @@ The first ablation stage changed one design factor at a time around the neutral-
 | Run | Validation Macro-F1 | Test Accuracy | Test Macro-F1 |
 |---|---:|---:|---:|
 | r4 attention+MLP, dropout 0.05, lr 1e-4 | 0.8674 | 0.8858 | 0.8792 |
-| r8 attention+MLP, dropout 0.05, lr 1e-4 | 0.8783 | 0.8858 | 0.8813 |
+| Final LoRA r8 attention+MLP, dropout 0.05, lr 1e-4 (seed42) | 0.8783 | 0.8858 | 0.8813 |
 | r16 attention+MLP, dropout 0.05, lr 1e-4 | 0.8755 | 0.8721 | 0.8723 |
 | r8 attention-only, dropout 0.05, lr 1e-4 | 0.8641 | 0.8817 | 0.8741 |
-| r8 MLP-only, dropout 0.05, lr 1e-4 | 0.8758 | 0.8900 | 0.8844 |
-| r8 attention+MLP, dropout 0.10, lr 1e-4 | 0.8804 | 0.8831 | 0.8814 |
-| r8 attention+MLP, dropout 0.05, lr 2e-4 | 0.8848 | 0.8858 | 0.8792 |
+| MLP-only LoRA r8 candidate, dropout 0.05, lr 1e-4 (seed42) | 0.8758 | 0.8900 | 0.8844 |
+| attention+MLP LoRA r8, dropout 0.10, lr 1e-4 | 0.8804 | 0.8831 | 0.8814 |
+| attention+MLP LoRA r8, dropout 0.05, lr 2e-4 | 0.8848 | 0.8858 | 0.8792 |
 
 The second stage extended the final deployed candidate and the strongest MLP-only competitor to ten random seeds. This was done because a small number of seeds can give an unstable impression of which LoRA target-module choice is better.
 
 | Candidate family | Seeds | Val Macro-F1 Mean | Val Macro-F1 Std | Test Macro-F1 Mean | Test Macro-F1 Std | Test Accuracy Mean |
 |---|---:|---:|---:|---:|---:|---:|
-| r8 attention+MLP, dropout 0.05, lr 1e-4 | 10 | 0.8667 | 0.0081 | 0.8727 | 0.0087 | 0.8770 |
-| r8 MLP-only, dropout 0.05, lr 1e-4 | 10 | 0.8658 | 0.0072 | 0.8702 | 0.0101 | 0.8761 |
+| Final LoRA r8 attention+MLP | 10 | 0.8667 | 0.0081 | 0.8727 | 0.0087 | 0.8770 |
+| MLP-only LoRA r8 candidate | 10 | 0.8658 | 0.0072 | 0.8702 | 0.0101 | 0.8761 |
 
 After the 10-seed check, the attention+MLP adapter is slightly stronger on mean Financial PhraseBank test macro-F1 and has a slightly lower test standard deviation. It also remains slightly stronger on the NOSIBLE external formal-news evaluation. Therefore the final choice remains `neutral_aware_lora_r8_full_raw_seed42`. The conclusion is deliberately modest: the advantage over MLP-only LoRA is small, but the final adapter is supported by both in-domain seed stability and external robustness.
 
@@ -208,12 +208,12 @@ On the full `NOSIBLE/financial-sentiment` external set, neutral-aware LoRA trans
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
-| Deployed Qwen3-4B LoRA r8 (seed42) | 0.7830 | 0.7817 | 0.7827 |
-| MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
+| Final LoRA r8 attention+MLP (seed42) | 0.7830 | 0.7817 | 0.7827 |
+| MLP-only LoRA r8 candidate (seed42) | 0.7804 | 0.7769 | 0.7798 |
 
 Paired comparison supports the difference: LoRA corrects 16,244 examples that FinBERT gets wrong while losing 10,495 examples that FinBERT gets right. The accuracy gain is 0.0575 and the macro-F1 gain is 0.0528.
 
-The MLP-only candidate is close but slightly below the deployed attention+MLP adapter on NOSIBLE: -0.0026 accuracy and -0.0047 macro-F1. Together with the 10-seed Financial PhraseBank check, this result supports keeping the current final model.
+The MLP-only candidate is reported only as an ablation/model-selection comparison, not as a deployed model. It is close but slightly below the final attention+MLP adapter on NOSIBLE: -0.0026 accuracy and -0.0047 macro-F1. Together with the 10-seed Financial PhraseBank check, this result supports keeping the current final model.
 
 Length-bin analysis shows a remaining limitation. LoRA is strongest on short and medium formal-news snippets, with macro-F1 0.8280 for texts with 50 words or fewer and 0.7952 for 51-150 words. It drops to 0.5796 for 151-300 word inputs, which supports the need for window-based long-article processing.
 

@@ -124,7 +124,7 @@ Financial PhraseBank `sentences_50agree`, fixed test split:
 | strict BERT supervised baseline | 0.8418 | 0.8215 | 0.8406 |
 | FinBERT reference | 0.8776 | 0.8650 | 0.8792 |
 | Qwen3-4B LoRA 100% raw (r16) | 0.8803 | 0.8789 | 0.8813 |
-| deployed Qwen3-4B LoRA r8 (seed42) | 0.8858 | 0.8813 | 0.8848 |
+| Final LoRA r8 attention+MLP (seed42) | 0.8858 | 0.8813 | 0.8848 |
 
 The LoRA row reports the concrete seed42 checkpoint included in this repository and used by the Streamlit prototype. The separate 10-seed stability check below reports configuration-level robustness for the same rank-8 attention+MLP LoRA design.
 
@@ -133,15 +133,14 @@ External formal-news robustness on `NOSIBLE/financial-sentiment`, full 100,000-e
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
-| deployed Qwen3-4B LoRA r8 (seed42) | 0.7830 | 0.7817 | 0.7827 |
-| MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
+| Final LoRA r8 attention+MLP (seed42) | 0.7830 | 0.7817 | 0.7827 |
 
 Final 10-seed stability check on Financial PhraseBank:
 
 | Candidate family | Seeds | Val Macro-F1 mean +/- std | Test Macro-F1 mean +/- std | Test Accuracy mean |
 |---|---:|---:|---:|---:|
-| r8 attention+MLP, dropout 0.05, lr 1e-4 | 10 | 0.8667 +/- 0.0081 | 0.8727 +/- 0.0087 | 0.8770 |
-| r8 MLP-only, dropout 0.05, lr 1e-4 | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
+| Final LoRA r8 attention+MLP | 10 | 0.8667 +/- 0.0081 | 0.8727 +/- 0.0087 | 0.8770 |
+| MLP-only LoRA r8 candidate | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
 
 The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model. In the final 10-seed check, it is slightly stronger and slightly more stable than the MLP-only competitor on Financial PhraseBank, and it also performs better on the external formal-news evaluation.
 
