@@ -9,7 +9,7 @@ The project combines:
 - `ProsusAI/finbert` as a financial-domain reference model.
 - Sentence-level evaluation on Financial PhraseBank.
 - External formal-news robustness evaluation on `NOSIBLE/financial-sentiment`.
-- Multi-seed LoRA model-selection checks covering rank, target modules, dropout, and learning rate.
+- LoRA model-selection checks covering rank, target modules, dropout, learning rate, and 10-seed stability.
 - A Streamlit interface for text and URL-based financial news analysis.
 
 ## Repository Structure
@@ -108,6 +108,8 @@ scripts/calibrate_confidence.py
 scripts/evaluate_agreement_robustness.py
 scripts/statistical_tests.py
 scripts/evaluate_sequence_classifier.py
+scripts/run_lora_ablation_grid.py
+scripts/run_lora_seed_stability_10.py
 ```
 
 ## Results
@@ -131,7 +133,14 @@ External formal-news robustness on `NOSIBLE/financial-sentiment`, full 100,000-e
 | neutral-aware Qwen3-4B LoRA r8 | 0.7830 | 0.7817 | 0.7827 |
 | MLP-only neutral-aware Qwen3-4B LoRA r8 | 0.7804 | 0.7769 | 0.7798 |
 
-The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model: an MLP-only candidate had the best mean Financial PhraseBank test macro-F1 across the final seed check, but it was slightly weaker on the external formal-news evaluation.
+Final 10-seed stability check on Financial PhraseBank:
+
+| Candidate family | Seeds | Val Macro-F1 mean +/- std | Test Macro-F1 mean +/- std | Test Accuracy mean |
+|---|---:|---:|---:|---:|
+| r8 attention+MLP, dropout 0.05, lr 1e-4 | 10 | 0.8667 +/- 0.0081 | 0.8727 +/- 0.0087 | 0.8770 |
+| r8 MLP-only, dropout 0.05, lr 1e-4 | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
+
+The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model. In the final 10-seed check, it is slightly stronger and slightly more stable than the MLP-only competitor on Financial PhraseBank, and it also performs better on the external formal-news evaluation.
 
 ## Research Report
 

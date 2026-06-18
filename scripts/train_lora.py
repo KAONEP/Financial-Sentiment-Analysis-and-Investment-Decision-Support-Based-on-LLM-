@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from datasets import Dataset
 from peft import LoraConfig, get_peft_model
+from torch.utils.data import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, set_seed
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -82,13 +82,24 @@ def latest_checkpoint(output_dir: Path) -> str | None:
     return str(max(checkpoints, key=lambda item: item[0])[1])
 
 
+class TokenizedListDataset(Dataset):
+    def __init__(self, rows: list[dict]):
+        self.rows = rows
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> dict:
+        return self.rows[index]
+
+
 def build_tokenized_dataset(
     df: pd.DataFrame,
     tokenizer,
     enable_thinking: bool,
     max_length: int,
     prompt_mode: str,
-) -> Dataset:
+) -> TokenizedListDataset:
     rows = []
     for item in df.to_dict(orient="records"):
         if prompt_mode == "neutral_aware":
@@ -139,7 +150,7 @@ def build_tokenized_dataset(
                 "labels": labels,
             }
         )
-    return Dataset.from_list(rows)
+    return TokenizedListDataset(rows)
 
 
 def main() -> None:
