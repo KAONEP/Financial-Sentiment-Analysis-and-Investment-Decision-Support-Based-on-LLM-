@@ -70,10 +70,11 @@ def fig_main_performance() -> None:
         "Qwen reasoning",
         "Strict BERT",
         "FinBERT ref.",
-        "LoRA seed42",
+        "LoRA attn+MLP",
+        "LoRA MLP-only",
     ]
-    macro_f1 = np.array([0.7711, 0.7961, 0.8215, 0.8650, 0.8813])
-    colors = [COLORS["gray"], COLORS["gray"], COLORS["sky"], COLORS["blue"], COLORS["coral"]]
+    macro_f1 = np.array([0.7711, 0.7961, 0.8215, 0.8650, 0.8813, 0.8844])
+    colors = [COLORS["gray"], COLORS["gray"], COLORS["sky"], COLORS["blue"], COLORS["coral"], COLORS["teal"]]
 
     fig, ax = plt.subplots(figsize=(6.75, 2.75))
     y = np.arange(len(methods))
@@ -91,9 +92,9 @@ def fig_main_performance() -> None:
 
 
 def fig_data_size_balance() -> None:
-    fractions = np.array([20, 50, 100])
-    raw = np.array([0.8231, 0.8574, 0.8789])
-    balanced = np.array([0.8142, 0.8517, 0.8555])
+    fractions = np.array([20, 50, 75, 100])
+    raw = np.array([0.8231, 0.8574, 0.8642, 0.8789])
+    balanced = np.array([0.8142, 0.8517, 0.8522, 0.8555])
 
     fig, ax = plt.subplots(figsize=(5.4, 3.1))
     ax.plot(
@@ -163,9 +164,9 @@ def fig_seed_stability() -> None:
 
 
 def fig_external_robustness() -> None:
-    methods = ["FinBERT ref.", "LoRA seed42", "MLP-only"]
-    accuracy = np.array([0.7255, 0.7830, 0.7804])
-    macro_f1 = np.array([0.7289, 0.7817, 0.7769])
+    methods = ["FinBERT ref.", "Selected LoRA"]
+    accuracy = np.array([0.7255, 0.7830])
+    macro_f1 = np.array([0.7289, 0.7817])
 
     fig, ax = plt.subplots(figsize=(5.8, 3.1))
     x = np.arange(len(methods))
@@ -230,7 +231,7 @@ def fig_system_pipeline() -> None:
         "Article\nextraction",
         "Window\nchunking",
         "LoRA label\nscoring",
-        "Probability\naggregation",
+        "Calibration +\naggregation",
         "Sentiment,\nevidence,\ninsight",
     ]
     colors = ["#E8EDF2", "#E8EDF2", "#F5F0E8", "#E8F2EE", "#E8F2EE", "#FCE7DD"]
@@ -243,7 +244,7 @@ def fig_system_pipeline() -> None:
     ax.text(
         5.65,
         1.93,
-        "Deployed classifier: neutral-aware Qwen3-4B LoRA r8 (seed42)",
+        "Deployed classifier: neutral-aware Qwen3-4B LoRA r8 (seed42), calibrated confidence",
         ha="center",
         va="center",
         fontsize=10,
@@ -267,9 +268,9 @@ def fig_progress_summary() -> None:
 
     # Panel A: main Macro-F1 comparison.
     ax = axes[0]
-    methods = ["Qwen\nDirect", "Qwen\nReason.", "Strict\nBERT", "FinBERT", "LoRA\nseed42"]
-    macro_f1 = np.array([0.7711, 0.7961, 0.8215, 0.8650, 0.8813])
-    colors = [COLORS["gray"], COLORS["gray"], COLORS["sky"], COLORS["blue"], COLORS["coral"]]
+    methods = ["Qwen\nDirect", "Qwen\nReason.", "Strict\nBERT", "FinBERT", "LoRA\nA+M", "LoRA\nMLP"]
+    macro_f1 = np.array([0.7711, 0.7961, 0.8215, 0.8650, 0.8813, 0.8844])
+    colors = [COLORS["gray"], COLORS["gray"], COLORS["sky"], COLORS["blue"], COLORS["coral"], COLORS["teal"]]
     x = np.arange(len(methods))
     ax.bar(x, macro_f1, color=colors, edgecolor="white", linewidth=0.7)
     ax.set_xticks(x)
@@ -282,9 +283,9 @@ def fig_progress_summary() -> None:
 
     # Panel B: data size and label balance.
     ax = axes[1]
-    fractions = np.array([20, 50, 100])
-    raw = np.array([0.8231, 0.8574, 0.8789])
-    balanced = np.array([0.8142, 0.8517, 0.8555])
+    fractions = np.array([20, 50, 75, 100])
+    raw = np.array([0.8231, 0.8574, 0.8642, 0.8789])
+    balanced = np.array([0.8142, 0.8517, 0.8522, 0.8555])
     ax.plot(fractions, raw, marker="o", color=COLORS["coral"], linewidth=2.0, label="Raw")
     ax.plot(fractions, balanced, marker="s", color=COLORS["blue"], linewidth=2.0, label="Balanced")
     ax.set_xticks(fractions)

@@ -5,6 +5,7 @@ import re
 
 import numpy as np
 
+from .calibration import DEFAULT_LORA_TEMPERATURE, calibrate_lora_probabilities
 from .labels import LABELS
 
 
@@ -104,6 +105,8 @@ def lora_only_decision(
     base_confidence = float(final_probs[base_idx])
     trace = (
         "The final decision uses the neutral-aware Qwen3-4B LoRA classifier. "
+        f"The displayed LoRA confidence is temperature-scaled with T={DEFAULT_LORA_TEMPERATURE:.3f}, "
+        "learned on the validation split; this calibrates probability sharpness without changing the predicted label. "
         "FinBERT is shown as a reference baseline but is not used to change the final label."
     )
     return SentimentDecision(
@@ -132,7 +135,7 @@ def build_explanation(
         length_note = " The input is relatively long, so the model focuses on the first tokenized segment allowed by the configured maximum length."
     return (
         f"FinBERT predicts {finbert.prediction} ({finbert.confidence:.3f}) and "
-        f"LoRA predicts {llm.prediction} ({llm.confidence:.3f}); the models {agreement}. "
+        f"calibrated LoRA predicts {llm.prediction} ({llm.confidence:.3f}); the models {agreement}. "
         f"{decision.trace}{uncertainty}{length_note}"
     )
 
@@ -305,9 +308,10 @@ def decide_from_probabilities(finbert_probs: np.ndarray, llm_probs: np.ndarray, 
 
 def analyze_with_models(text: str, finbert_model, llm_model, mode: str) -> SentimentSystemResult:
     finbert_probs = finbert_model.predict_proba([text], batch_size=1)[0]
-    llm_probs = llm_model.predict_proba([text], batch_size=1)[0]
+    raw_llm_probs = llm_model.predict_proba([text], batch_size=1)[0]
+    llm_probs = calibrate_lora_probabilities(raw_llm_probs)
     finbert = prediction_from_probs(finbert_probs, "ProsusAI/finbert")
-    llm = prediction_from_probs(llm_probs, "Qwen3-4B neutral-aware LoRA r8")
+    llm = prediction_from_probs(llm_probs, f"Qwen3-4B neutral-aware LoRA r8 calibrated T={DEFAULT_LORA_TEMPERATURE:.3f}")
     decision = decide_from_probabilities(finbert.probabilities, llm.probabilities, mode)
     explanation = build_explanation(text, finbert, llm, decision)
     support = build_investment_support(decision.label, decision.confidence)
@@ -351,8 +355,9 @@ def build_document_explanation(result: DocumentSentimentResult, mode: str) -> st
     evidence_ids = ", ".join(str(chunk.chunk_id + 1) for chunk in result.top_evidence)
     explanation = (
         f"The article was split into {len(result.chunks)} chunks and each chunk was analyzed with the LoRA classifier, with FinBERT retained as a reference baseline. "
+        f"LoRA probabilities are temperature-scaled with T={DEFAULT_LORA_TEMPERATURE:.3f} before confidence reporting and chunk aggregation. "
         f"Chunk labels were negative={counts['negative']}, neutral={counts['neutral']}, positive={counts['positive']}. "
-        f"The document-level probabilities are confidence-weighted across chunks, using mode `{mode}`. "
+        f"The document-level probabilities are calibrated-confidence-weighted across chunks, using mode `{mode}`. "
         f"The strongest evidence chunks are: {evidence_ids}."
     )
     if result.scale_summaries:
@@ -377,12 +382,16 @@ def _analyze_chunk_texts(
     start_chunk_id: int = 0,
 ) -> list[ChunkSentimentResult]:
     finbert_probs = finbert_model.predict_proba(chunk_texts, batch_size=8)
-    llm_probs = llm_model.predict_proba(chunk_texts, batch_size=1)
+    raw_llm_probs = llm_model.predict_proba(chunk_texts, batch_size=1)
+    llm_probs = calibrate_lora_probabilities(raw_llm_probs)
 
     chunks: list[ChunkSentimentResult] = []
     for idx, chunk_text in enumerate(chunk_texts):
         finbert = prediction_from_probs(finbert_probs[idx], "ProsusAI/finbert")
-        llm = prediction_from_probs(llm_probs[idx], "Qwen3-4B neutral-aware LoRA r8")
+        llm = prediction_from_probs(
+            llm_probs[idx],
+            f"Qwen3-4B neutral-aware LoRA r8 calibrated T={DEFAULT_LORA_TEMPERATURE:.3f}",
+        )
         decision = decide_from_probabilities(finbert.probabilities, llm.probabilities, mode)
         chunks.append(
             ChunkSentimentResult(

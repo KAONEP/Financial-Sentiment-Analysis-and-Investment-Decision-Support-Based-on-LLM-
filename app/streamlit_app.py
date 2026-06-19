@@ -11,6 +11,7 @@ import trafilatura
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from financial_llm.finbert import FinBertSentiment
+from financial_llm.calibration import DEFAULT_LORA_TEMPERATURE
 from financial_llm.labels import LABELS
 from financial_llm.llm_classifier import LabelScoringLLM
 from financial_llm.system import (
@@ -97,7 +98,7 @@ def probability_frame(result) -> pd.DataFrame:
     rows = []
     for source, output in [
         ("FinBERT reference", result.finbert),
-        ("Qwen3-4B LoRA final", result.llm),
+        ("Qwen3-4B LoRA calibrated", result.llm),
     ]:
         probs = output.probabilities
         rows.append(
@@ -174,7 +175,7 @@ def render_result(result, investment_support: str | None = None) -> None:
     metric_cols[0].metric("Final sentiment", result.decision.label)
     metric_cols[1].metric("Final confidence", f"{result.decision.confidence:.3f}")
     metric_cols[2].metric("FinBERT", f"{result.finbert.prediction} ({result.finbert.confidence:.3f})")
-    metric_cols[3].metric("LoRA", f"{result.llm.prediction} ({result.llm.confidence:.3f})")
+    metric_cols[3].metric("LoRA calibrated", f"{result.llm.prediction} ({result.llm.confidence:.3f})")
 
     st.subheader("Investment support insight")
     st.write(investment_support or result.investment_support)
@@ -195,7 +196,8 @@ def render_result(result, investment_support: str | None = None) -> None:
             st.write(f"Final confidence: `{result.decision.confidence:.3f}`")
             st.caption(
                 "This system provides decision-support evidence, not trading instructions. "
-                "The final confidence is the LoRA probability assigned to the displayed final label."
+                f"The final confidence is the temperature-scaled LoRA probability assigned to the displayed final label "
+                f"(T={DEFAULT_LORA_TEMPERATURE:.3f}, learned on the validation split)."
             )
 
 
@@ -234,7 +236,7 @@ def render_document_result(result, investment_support: str | None = None) -> Non
             st.caption(
                 f"Window: {chunk.chunk_words or 'single'} words | "
                 f"FinBERT: {chunk.finbert.prediction} ({chunk.finbert.confidence:.3f}) | "
-                f"LoRA: {chunk.llm.prediction} ({chunk.llm.confidence:.3f}) | "
+                f"LoRA calibrated: {chunk.llm.prediction} ({chunk.llm.confidence:.3f}) | "
                 f"Evidence score: {chunk.evidence_score:.3f}"
             )
             if idx < len(result.top_evidence):
@@ -266,7 +268,10 @@ def main() -> None:
     with st.sidebar:
         st.header("Model pipeline")
         mode = DEPLOYED_MODE
-        st.caption("Final classifier: neutral-aware Qwen3-4B LoRA. FinBERT is shown as a reference baseline.")
+        st.caption(
+            f"Final classifier: neutral-aware Qwen3-4B LoRA. Confidence uses validation temperature scaling "
+            f"(T={DEFAULT_LORA_TEMPERATURE:.3f}). FinBERT is shown as a reference baseline."
+        )
         st.divider()
         document_mode = st.toggle(
             "Auto chunk long articles",
@@ -296,6 +301,7 @@ def main() -> None:
             chunk_overlap = st.number_input("Chunk overlap", min_value=0, max_value=80, value=DEFAULT_CHUNK_OVERLAP, step=5)
         st.divider()
         st.caption("Final model: Qwen3-4B neutral-aware LoRA r8.")
+        st.caption(f"Displayed confidence: calibrated LoRA probability, T={DEFAULT_LORA_TEMPERATURE:.3f}")
         st.caption("LoRA adapter: adapters/neutral_aware_lora_r8_full_raw_seed42")
 
     input_mode = st.radio("Input type", ["Text", "URL"], horizontal=True)

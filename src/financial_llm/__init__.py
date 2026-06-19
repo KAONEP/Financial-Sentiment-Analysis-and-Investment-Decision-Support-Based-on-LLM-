@@ -3,6 +3,7 @@
 __all__ = [
     "labels",
     "data",
+    "calibration",
     "metrics",
     "prompts",
 ]

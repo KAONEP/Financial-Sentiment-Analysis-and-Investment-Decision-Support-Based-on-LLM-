@@ -10,6 +10,7 @@ The project combines:
 - Sentence-level evaluation on Financial PhraseBank.
 - External formal-news robustness evaluation on `NOSIBLE/financial-sentiment`.
 - LoRA model-selection checks covering rank, target modules, dropout, learning rate, and 10-seed stability.
+- Confidence reliability analysis with ECE, Brier score, NLL, and temperature scaling.
 - A Streamlit interface for text and URL-based financial news analysis.
 
 ## Repository Structure
@@ -61,7 +62,7 @@ pip install -r requirements.txt
 python -m streamlit run app/streamlit_app.py
 ```
 
-The app supports pasted financial news text and URL input. For long articles, it uses overlapping text windows, confidence-weighted aggregation, and optional multi-scale sensitivity checking. The investment-support insight is generated from the final sentiment result and supporting evidence excerpts, and is constrained to avoid direct buy, sell, hold, trading, or price-target recommendations.
+The app supports pasted financial news text and URL input. For long articles, it uses overlapping text windows, calibrated-confidence-weighted aggregation, and optional multi-scale sensitivity checking. The investment-support insight is generated from the final sentiment result and supporting evidence excerpts, and is constrained to avoid direct buy, sell, hold, trading, or price-target recommendations.
 
 ## Reproduce Experiments
 
@@ -115,7 +116,7 @@ scripts/run_lora_seed_stability_10.py
 
 ## Results
 
-Financial PhraseBank `sentences_50agree`, fixed test split:
+Baseline comparison on Financial PhraseBank `sentences_50agree`, fixed test split:
 
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
@@ -123,26 +124,58 @@ Financial PhraseBank `sentences_50agree`, fixed test split:
 | Qwen3-4B reasoning prompt | 0.8019 | 0.7961 | 0.7996 |
 | strict BERT supervised baseline | 0.8418 | 0.8215 | 0.8406 |
 | FinBERT reference | 0.8776 | 0.8650 | 0.8792 |
-| Qwen3-4B LoRA 100% raw (r16) | 0.8803 | 0.8789 | 0.8813 |
-| Final LoRA r8 attention+MLP (seed42) | 0.8858 | 0.8813 | 0.8848 |
 
-The LoRA row reports the concrete seed42 checkpoint included in this repository and used by the Streamlit prototype. The separate 10-seed stability check below reports configuration-level robustness for the same rank-8 attention+MLP LoRA design.
+LoRA data-size and label-balance check:
+
+| Condition | Accuracy | Macro-F1 | Weighted-F1 |
+|---|---:|---:|---:|
+| LoRA 20% balanced | 0.8074 | 0.8142 | 0.8088 |
+| LoRA 20% raw | 0.8308 | 0.8231 | 0.8264 |
+| LoRA 50% raw | 0.8624 | 0.8574 | 0.8616 |
+| LoRA 50% balanced | 0.8501 | 0.8517 | 0.8507 |
+| LoRA 75% raw | 0.8707 | 0.8642 | 0.8665 |
+| LoRA 75% balanced | 0.8583 | 0.8522 | 0.8581 |
+| LoRA 100% raw | 0.8803 | 0.8789 | 0.8813 |
+| LoRA 100% balanced | 0.8624 | 0.8555 | 0.8635 |
+
+The full raw training split is kept for later LoRA experiments because it performs best on the naturally neutral-heavy test distribution.
+
+Single-seed LoRA screening on the same Financial PhraseBank split:
+
+| Model setting | Accuracy | Macro-F1 | Weighted-F1 |
+|---|---:|---:|---:|
+| Qwen3-4B LoRA 100% raw r16 attention+MLP | 0.8803 | 0.8789 | 0.8813 |
+| Neutral-aware LoRA r8 attention+MLP (seed42) | 0.8858 | 0.8813 | 0.8848 |
+| Neutral-aware LoRA r8 MLP-only (seed42) | 0.8900 | 0.8844 | 0.8887 |
+
+This screening step identifies attention+MLP and MLP-only as the two strongest LoRA settings. Since MLP-only is slightly higher on this one seed, the two settings are then compared across 10 random seeds before choosing the system model.
+
+Final 10-seed LoRA comparison on Financial PhraseBank:
+
+| Model variant | Seeds | Val Macro-F1 mean +/- std | Test Macro-F1 mean +/- std | Test Accuracy mean |
+|---|---:|---:|---:|---:|
+| LoRA r8 attention+MLP | 10 | 0.8667 +/- 0.0081 | 0.8727 +/- 0.0087 | 0.8770 |
+| LoRA r8 MLP-only | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
 
 External formal-news robustness on `NOSIBLE/financial-sentiment`, full 100,000-example evaluation set:
 
 | Method | Accuracy | Macro-F1 | Weighted-F1 |
 |---|---:|---:|---:|
 | FinBERT reference | 0.7255 | 0.7289 | 0.7259 |
-| Final LoRA r8 attention+MLP (seed42) | 0.7830 | 0.7817 | 0.7827 |
+| Selected LoRA r8 attention+MLP (seed42) | 0.7830 | 0.7817 | 0.7827 |
 
-Final 10-seed stability check on Financial PhraseBank:
+Confidence reliability check on Financial PhraseBank test split:
 
-| Candidate family | Seeds | Val Macro-F1 mean +/- std | Test Macro-F1 mean +/- std | Test Accuracy mean |
-|---|---:|---:|---:|---:|
-| Final LoRA r8 attention+MLP | 10 | 0.8667 +/- 0.0081 | 0.8727 +/- 0.0087 | 0.8770 |
-| MLP-only LoRA r8 candidate | 10 | 0.8658 +/- 0.0072 | 0.8702 +/- 0.0101 | 0.8761 |
+| Model | Condition | NLL | Brier | ECE |
+|---|---|---:|---:|---:|
+| FinBERT | uncalibrated | 0.3400 | 0.1888 | 0.0189 |
+| FinBERT | temperature-scaled | 0.3394 | 0.1891 | 0.0179 |
+| LoRA r8 attention+MLP | uncalibrated | 0.2825 | 0.1673 | 0.0412 |
+| LoRA r8 attention+MLP | temperature-scaled | 0.2696 | 0.1618 | 0.0151 |
 
-The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting, and that this improvement transfers to a large formal-news external dataset. The final deployed adapter remains the neutral-aware rank-8 attention+MLP LoRA model. In the final 10-seed check, it is slightly stronger and slightly more stable than the MLP-only competitor on Financial PhraseBank, and it also performs better on the external formal-news evaluation.
+The Streamlit prototype uses the temperature-scaled LoRA probabilities for displayed confidence, evidence weighting, and long-article aggregation. Temperature scaling is learned on the validation split and changes probability sharpness without changing the predicted label.
+
+The main finding is that LoRA makes Qwen3-4B much better aligned with investor-perspective financial sentiment labels than direct prompting or reasoning prompting. Although MLP-only is slightly better in the seed42 PhraseBank comparison, attention+MLP is slightly stronger in the 10-seed comparison. The final system therefore uses the neutral-aware rank-8 attention+MLP LoRA model, and this selected model is then evaluated on the external formal-news dataset.
 
 ## Figures
 
@@ -173,7 +206,7 @@ It describes the dataset, baselines, LoRA training method, data-size and label-b
 - Financial PhraseBank is small and sentence-level, while real financial articles are longer and more complex.
 - `ProsusAI/finbert` is used as an off-the-shelf reference model and is not treated as a leakage-free supervised baseline for Financial PhraseBank.
 - The LoRA model is trained with a maximum sequence length of 384, so long-article support relies on window aggregation.
-- Confidence is based on maximum softmax probability and should be interpreted as a model score rather than a guaranteed correctness probability.
+- Confidence is based on validation-calibrated LoRA probabilities and should still be interpreted as a model score rather than a guaranteed correctness probability.
 - The system is a research decision-support prototype and does not provide financial advice.
 
 ## License And Data Notes
